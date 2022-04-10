@@ -1,0 +1,16 @@
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+
+*.patch
+*.diff
+*.bak
+
+*.so
+*.a
+.DS_Store
+
+out/
+obj/
+libs/

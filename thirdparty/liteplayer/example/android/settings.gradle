@@ -1,0 +1,3 @@
+include ':example'
+include ':library'
+rootProject.name = "LiteplayerDemo"
