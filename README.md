@@ -5,7 +5,7 @@
 - 跨平台：已适配 MacOSX、Ubuntu、ESP32 平台，后续看需求支持更多的平台
 
 Demo 视频：
- - [Ubuntu 精灵语音助手](https://www.bilibili.com/video/BV1Tu411R7y4)
+ - [MacOSX 精灵语音助手](https://www.bilibili.com/video/BV1Na411q7o8)
  - [ESP32 精灵智能音箱](https://www.bilibili.com/video/BV1q34y1C7CA)
 
 ## 精灵整体框架图
