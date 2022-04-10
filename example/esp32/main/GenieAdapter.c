@@ -71,7 +71,6 @@ bool GnVendor_init()
         return false;
     }
 
-
     size_t uuidLen = sizeof(sGnAccountUuid);
     memset(sGnAccountUuid, 0x0, uuidLen);
     if (nvs_get_str(sNvsHandle, GENIE_NVS_KEY_UUID, sGnAccountUuid, &uuidLen) != ESP_OK)
