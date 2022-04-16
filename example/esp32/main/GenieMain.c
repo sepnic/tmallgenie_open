@@ -30,7 +30,6 @@
 #include "esp_wifi.h"
 #include "esp_system.h"
 #include "esp_log.h"
-#include "esp_event_loop.h"
 #include "periph_wifi.h"
 #include "periph_adc_button.h"
 #include "periph_button.h"
@@ -45,8 +44,10 @@
 #define ESP_IDF_VERSION_VAL(major, minor, patch) 1
 #endif
 #if (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 1, 0))
+#include "esp_event.h"
 #include "esp_netif.h"
 #else
+#include "esp_event_loop.h"
 #include "tcpip_adapter.h"
 #endif
 

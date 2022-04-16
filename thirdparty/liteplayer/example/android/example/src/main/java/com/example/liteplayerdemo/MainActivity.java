@@ -197,14 +197,14 @@ public class MainActivity extends Activity {
         }
     }
 
-    private Liteplayer.OnIdleListener mIdleListener = new Liteplayer.OnIdleListener() {
+    private final Liteplayer.OnIdleListener mIdleListener = new Liteplayer.OnIdleListener() {
         public void onIdle(Liteplayer p) {
             mStatus = LITEPLAYER_IDLE;
             mStatusView.setText("Idle");
         }
     };
 
-    private Liteplayer.OnPreparedListener mPreparedListener = new Liteplayer.OnPreparedListener() {
+    private final Liteplayer.OnPreparedListener mPreparedListener = new Liteplayer.OnPreparedListener() {
         public void onPrepared(Liteplayer p) {
             mStatus = LITEPLAYER_PREPARED;
             mStatusView.setText("Prepared");
@@ -212,21 +212,21 @@ public class MainActivity extends Activity {
         }
     };
 
-    private Liteplayer.OnStartedListener mStartedListener = new Liteplayer.OnStartedListener() {
+    private final Liteplayer.OnStartedListener mStartedListener = new Liteplayer.OnStartedListener() {
         public void onStarted(Liteplayer p) {
             mStatus = LITEPLAYER_STARTED;
             mStatusView.setText("Started");
         }
     };
 
-    private Liteplayer.OnPausedListener mPausedListener = new Liteplayer.OnPausedListener() {
+    private final Liteplayer.OnPausedListener mPausedListener = new Liteplayer.OnPausedListener() {
         public void onPaused(Liteplayer p) {
             mStatus = LITEPLAYER_PAUSED;
             mStatusView.setText("Paused");
         }
     };
 
-    private Liteplayer.OnSeekCompletedListener mSeekCompletedListener = new Liteplayer.OnSeekCompletedListener() {
+    private final Liteplayer.OnSeekCompletedListener mSeekCompletedListener = new Liteplayer.OnSeekCompletedListener() {
         public void onSeekCompleted(Liteplayer p) {
             mStatusView.setText("SeekCompleted");
             if (mStatus != LITEPLAYER_PAUSED) {
@@ -235,7 +235,7 @@ public class MainActivity extends Activity {
         }
     };
 
-    private Liteplayer.OnCompletedListener mCompletedListener = new Liteplayer.OnCompletedListener() {
+    private final Liteplayer.OnCompletedListener mCompletedListener = new Liteplayer.OnCompletedListener() {
         public void onCompleted(Liteplayer p) {
             mStatus = LITEPLAYER_COMPLETED;
             mStatusView.setText("Completed");
@@ -243,7 +243,7 @@ public class MainActivity extends Activity {
         }
     };
 
-    private Liteplayer.OnErrorListener mErrorListener = new Liteplayer.OnErrorListener() {
+    private final Liteplayer.OnErrorListener mErrorListener = new Liteplayer.OnErrorListener() {
         public void onError(Liteplayer p, int what, int extra) {
             mStatus = LITEPLAYER_ERROR;
             mStatusView.setText("Error");

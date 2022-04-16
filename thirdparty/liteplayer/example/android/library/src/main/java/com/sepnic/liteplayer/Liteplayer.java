@@ -40,7 +40,7 @@ public class Liteplayer {
 
     private final static String TAG = "LitelayerJava";
     private long mPlayerHandle;
-    private EventHandler mEventHandler;
+    private final EventHandler mEventHandler;
     private HandlerThread mHandlerThread;
     private AudioTrack mAudioTrack;
     private boolean mTrackTriggered;
@@ -58,7 +58,7 @@ public class Liteplayer {
     }
 
     private class EventHandler extends Handler {
-        private Liteplayer mLiteplayer;
+        private final Liteplayer mLiteplayer;
 
         public EventHandler(Liteplayer p, Looper looper) {
             super(looper);

@@ -705,7 +705,7 @@ static void GnLooper_Handle_Message(struct message *msg)
     case WHAT_COMMAND_NEW_PROMPT_URL:
         // (WHAT_COMMAND_NEW_PROMPT_URL, 0, 0, msgData)
         if (sGnUtpManager.isSpeakerMuted) {
-            OS_LOGW(TAG, "Speaker is muted, discard prompt:%s", msg->data);
+            OS_LOGW(TAG, "Speaker is muted, discard prompt:%s", (char *)msg->data);
             break;
         }
         node = OS_CALLOC(1, sizeof(GnPlayer_PlayNode_t));
@@ -720,7 +720,7 @@ static void GnLooper_Handle_Message(struct message *msg)
     case WHAT_COMMAND_NEW_MUSIC_URL:
         // (WHAT_COMMAND_NEW_MUSIC_URL, 0, 0, msgData)
         if (sGnUtpManager.isSpeakerMuted) {
-            OS_LOGW(TAG, "Speaker is muted, discard music:%s", msg->data);
+            OS_LOGW(TAG, "Speaker is muted, discard music:%s", (char *)msg->data);
             break;
         }
         node = OS_CALLOC(1, sizeof(GnPlayer_PlayNode_t));
@@ -735,7 +735,7 @@ static void GnLooper_Handle_Message(struct message *msg)
     case WHAT_COMMAND_NEW_PROMPT_WAKEUP_URL:
         // (WHAT_COMMAND_NEW_PROMPT_WAKEUP_URL, 0, 0, msgData)
         if (sGnUtpManager.isSpeakerMuted) {
-            OS_LOGW(TAG, "Speaker is muted, discard wakeup prompt:%s", msg->data);
+            OS_LOGW(TAG, "Speaker is muted, discard wakeup prompt:%s", (char *)msg->data);
             break;
         }
         GnPlayer_Do_Action(&sGnUtpManager.musicPlayer, GENIE_PLAYER_DO_SUSPEND, 0, 0, NULL);
