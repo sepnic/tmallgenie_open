@@ -4,9 +4,13 @@
 - 低开销：性能和内存开销极低，可以在各类 RTOS 系统上落地，如 ESP32 demo 为例，CPU 主频为 160MHz，堆内存开销 400KB 以内（还包括了 256KB 的音乐播放器缓冲区和 32KB 的 TTS 播放器缓冲区）
 - 跨平台：已适配 MacOSX、Ubuntu、ESP32 平台，后续看需求支持更多的平台
 
-Demo 视频：
+**演示视频：**
  - [MacOSX 精灵语音助手](https://www.bilibili.com/video/BV1Na411q7o8)
  - [ESP32 精灵智能音箱](https://www.bilibili.com/video/BV1q34y1C7CA)
+
+**编译运行：**
+- MacOSX/Ubuntu：[How to build tmallgenie for macosx/ubuntu](https://github.com/sepnic/tmallgenie_priv/blob/master/example/unix/README.md)
+- ESP32：[How to build tmallgenie for esp32](https://github.com/sepnic/tmallgenie_priv/blob/master/example/esp32/README.md)
 
 ## 精灵整体框架图
 ![GenieArchitecture](https://github.com/sepnic/tmallgenie_open/blob/master/GenieArchitecture.png)
@@ -67,10 +71,6 @@ Genie Interaction Service 是大管家，接收服务端下发的指令（比如
 player 包含两部分，分别是播控系统（UTPManager）和播放器（Liteplayer）。
 - 播控系统：按照所述的优先级实现播放器控制策略
 - 播放器：目前使用的是本人实现的 Liteplayer，也可以使用其他播放器接入到播控系统
-
-## 编译运行
-- MacOSX/Ubuntu：[How to build tmallgenie for macosx/ubuntu](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/README.md)
-- ESP32：[How to build tmallgenie for esp32](https://github.com/sepnic/tmallgenie_open/blob/master/example/esp32/README.md)
 
 ## 依赖的第三方库
 - [sysutils](https://github.com/sepnic/sysutils)：系统基本组件，包括 osal/looper/ringbuf/cipher/json/httpclient。作者：本人(Qinglong)，许可：Apache-2.0
