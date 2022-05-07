@@ -9,8 +9,8 @@
  - [ESP32 精灵智能音箱](https://www.bilibili.com/video/BV1q34y1C7CA)
 
 **编译运行：**
-- MacOSX/Ubuntu：[How to build tmallgenie for macosx/ubuntu](https://github.com/sepnic/tmallgenie_priv/blob/master/example/unix/README.md)
-- ESP32：[How to build tmallgenie for esp32](https://github.com/sepnic/tmallgenie_priv/blob/master/example/esp32/README.md)
+- MacOSX/Ubuntu：[How to build tmallgenie for macosx/ubuntu](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/README.md)
+- ESP32：[How to build tmallgenie for esp32](https://github.com/sepnic/tmallgenie_open/blob/master/example/esp32/README.md)
 
 ## 精灵整体框架图
 ![GenieArchitecture](https://github.com/sepnic/tmallgenie_open/blob/master/GenieArchitecture.png)
