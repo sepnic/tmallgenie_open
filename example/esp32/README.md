@@ -10,6 +10,8 @@ My esp-adf info:
  - head: fde2bb04a9e5873cd0a1657529b14c719c03466e
  - idf_ver: v3.3
 
+My esp32 development environment backup: https://gitee.com/sepnic/esp-adf-idf-3.3_windows
+
 ### Setup the environment variants
 
 ``` bash
