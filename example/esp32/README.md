@@ -28,4 +28,4 @@ idf.py menuconfig # config your wifi ssid&password, audio board, and check sdkco
 idf.py --no-ccache build       # build
 idf.py -p <PORT> flash monitor # flash image and monitor serial message
 ```
-
+Speaking "Hi LeXin" or pressing 'REC' key could wakeup Genie SDK for interaction

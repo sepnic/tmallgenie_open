@@ -30,6 +30,8 @@
 #include "filter_resample.h"
 #include "i2s_stream.h"
 #include "ringbuf.h"
+#include "esp_wn_iface.h"
+#include "esp_wn_models.h"
 
 #define TAG "GenieVoiceEngine"
 
@@ -37,7 +39,7 @@
 #define GENIE_RECORD_SAMPLE_BIT     16
 #define GENIE_RECORD_CHANNEL_COUNT  1
 #define GENIE_RECORD_RINGBUF_SIZE   8192
-#define GENIE_RECORD_READ_SIZE      1920
+#define GENIE_RECORD_READ_SIZE      960
 
 static audio_element_handle_t   sGnI2sElement = NULL;
 static audio_element_handle_t   sGnRspElement = NULL;
@@ -47,6 +49,13 @@ static bool                     sGnIsRecording = false;
 static char                     sGnRecordBuf[GENIE_RECORD_READ_SIZE];
 static litevad_handle_t         sGnVadHandle = NULL;
 static bool                     sGnVadActive = false;
+
+// see rec_eng_helper.h for more configs
+extern const esp_wn_iface_t esp_sr_wakenet5_quantized;
+extern const model_coeff_getter_t get_coeff_hilexin_wn5;
+static esp_wn_iface_t          *sGnWakenet = (esp_wn_iface_t *)&esp_sr_wakenet5_quantized;
+static model_coeff_getter_t    *sGnModelCoeffGetter = (model_coeff_getter_t *)&get_coeff_hilexin_wn5;
+static model_iface_data_t      *sGnModelData = NULL;
 
 static void GnVoiceEngine_recordTask(void *arg)
 {
@@ -73,7 +82,13 @@ static void GnVoiceEngine_recordTask(void *arg)
 
             rb_write(sGnRingbuf, sGnRecordBuf, bytes_read, portMAX_DELAY);
         } else {
-            // TODO: keyword detect: sdkCallback->onMicphoneWakeup("ni hao tian mao", 0, 0.600998834);
+            if (sGnModelData != NULL && sGnWakenet->detect(sGnModelData, (int16_t *)sGnRecordBuf) != 0) {
+                ESP_LOGW(TAG, "Keyword detected");
+                if (sdkCallback == NULL)
+                    GenieSdk_Get_Callback(&sdkCallback);
+                if (sdkCallback != NULL)
+                    sdkCallback->onMicphoneWakeup("ni hao tian mao", 0, 0.600998834);
+            }
         }
     }
 }
@@ -153,7 +168,10 @@ bool GnVoiceEngine_init()
         return false;
     }
 
-    xTaskCreatePinnedToCore(&GnVoiceEngine_recordTask, "fetch", 4 * 1024, NULL, 5, NULL, 0);
+    sGnModelData = sGnWakenet->create(sGnModelCoeffGetter, DET_MODE_90);
+
+    // main app works on cpu#0, and voice engine works on cpu#1
+    xTaskCreatePinnedToCore(&GnVoiceEngine_recordTask, "fetch", 4 * 1024, NULL, 5, NULL, 1);
     return true;
 }
 
