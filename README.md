@@ -2,15 +2,15 @@
 - 简单易用：平台层接入简单，适配 [GenieVendorAdapter](https://github.com/sepnic/tmallgenie_open/blob/master/include/GenieVendorAdapter.h) 接口即可；应用层使用简单，接口见 [GenieSdk](https://github.com/sepnic/tmallgenie_open/blob/master/include/GenieSdk.h)，使用范例见 [GenieMain](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/GenieMain.c)
 - 低延时：从说话结束到服务端响应的时间少于1秒，达到秒回的效果，与阿里官方智能音箱一样的交互体验
 - 低开销：性能和内存开销极低，可以在各类 RTOS 系统上落地，如 ESP32 demo 为例，CPU 主频为 160MHz，堆内存开销 400KB 以内（还包括了 256KB 的音乐播放器缓冲区和 32KB 的 TTS 播放器缓冲区）
-- 跨平台：已适配 MacOSX、Ubuntu、ESP32 平台，后续看需求支持更多的平台
+- 跨平台：已适配 MacOSX、Ubuntu、ESP32、Raspberrypi 平台，后续看需求支持更多的平台
 
 **演示视频：**
  - [MacOSX 精灵语音助手](https://www.bilibili.com/video/BV1Na411q7o8)
  - [ESP32 精灵智能音箱](https://www.bilibili.com/video/BV1q34y1C7CA)
 
 **编译运行：**
-- MacOSX/Ubuntu：[How to build tmallgenie for macosx/ubuntu](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/README.md)
-- ESP32：[How to build tmallgenie for esp32](https://github.com/sepnic/tmallgenie_open/blob/master/example/esp32/README.md)
+- MacOSX/Ubuntu/raspberrypi：[How to build tmallgenie on macosx/ubuntu/raspberrypi](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/README.md)
+- ESP32：[How to build tmallgenie on esp32](https://github.com/sepnic/tmallgenie_open/blob/master/example/esp32/README.md)
 
 ## 精灵整体框架图
 ![GenieArchitecture](https://github.com/sepnic/tmallgenie_open/blob/master/GenieArchitecture.png)
