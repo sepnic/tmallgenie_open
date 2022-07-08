@@ -28,12 +28,12 @@ register_component()
 
 target_compile_options(${COMPONENT_TARGET} PRIVATE -O3 -Wall -Werror -DGENIE_HAVE_SPEEXOGG_ENABLED)
 
-target_link_libraries(${COMPONENT_TARGET} "-L ${TOP_DIR}/lib/${ESP_TARGET_CHIP}")
+target_link_libraries(${COMPONENT_TARGET} "-L ${TOP_DIR}/lib/${ESP_TARGET_CHIP} -L ${LITEPLAYER_DIR}/lib/${ESP_TARGET_CHIP}")
 
 IF(IDF_VER MATCHES "v4.")
     add_prebuilt_library(tmallgenie_core "${TOP_DIR}/lib/${ESP_TARGET_CHIP}/libtmallgenie_core.a"
             PRIV_REQUIRES tmallgenie_open)
-    add_prebuilt_library(liteplayer_core "${TOP_DIR}/lib/${ESP_TARGET_CHIP}/libliteplayer_core.a"
+    add_prebuilt_library(liteplayer_core "${LITEPLAYER_DIR}/lib/${ESP_TARGET_CHIP}/libliteplayer_core.a"
             PRIV_REQUIRES tmallgenie_open)
 ENDIF()
 
