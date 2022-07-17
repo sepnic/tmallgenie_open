@@ -1,8 +1,8 @@
-## How to build tmallgenie on macosx/ubuntu/raspberrypi
+## How to build tmallgenie for macosx/ubuntu/raspberry-pi
 
 ### Environment dependencies
 
-Ubuntu/raspberrypi：`sudo apt-get install libatlas-base-dev libasound2-dev`
+Ubuntu/raspberry-pi：`sudo apt-get install libatlas-base-dev libasound2-dev`
 
 ### Build the project and run
 

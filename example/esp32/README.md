@@ -1,4 +1,4 @@
-## How to build tmallgenie on esp32
+## How to build tmallgenie for esp32
 
 ### Setup ESP-ADF
 
