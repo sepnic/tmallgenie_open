@@ -37,6 +37,8 @@
 static int  sGnSpeakerVolume = -1;
 static bool sGnSpeakerMuted = false;
 
+static bool sGnVoiceEngineInited = false;
+
 static bool sGnAccountAuthorized = false;
 static char sGnAccountUuid[512];
 static char sGnAccountAccessToken[512];
@@ -68,7 +70,10 @@ __done_account:
         cJSON_Delete(rootJson);
     if (file != NULL)
         fclose(file);
-    return GnVoiceEngine_init();
+    sGnVoiceEngineInited = GnVoiceEngine_init();
+    if (!sGnVoiceEngineInited)
+        OS_LOGE(TAG, "GnVoiceEngine_init failed");
+    return true;
 }
 
 // system & account info
@@ -209,7 +214,8 @@ void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
 {
     OS_LOGD(TAG, "Opening alsa-in: sampleRate=%d, channelCount=%d, bitsPerSample=%d",
             sampleRate, channelCount, bitsPerSample);
-    if (GnVoiceEngine_recorderStart(sampleRate, channelCount, bitsPerSample))
+    if (sGnVoiceEngineInited &&
+        GnVoiceEngine_recorderStart(sampleRate, channelCount, bitsPerSample))
         return (void *)0xffff;
     return NULL;
 }

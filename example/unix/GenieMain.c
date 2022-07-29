@@ -96,10 +96,13 @@ int main(int argc, char **argv)
     while (1) {
         OS_LOGW(TAG, "Waiting key event:");
         OS_LOGW(TAG, "  Q|q   : quit");
-        OS_LOGW(TAG, "  Enter : trigger voice interaction");
+        OS_LOGW(TAG, "  T|t   : trigger text recognition");
+        OS_LOGW(TAG, "  V|v   : trigger voice interaction");
         input = getc(stdin);
-        if (input == '\n') {
+        if (input == 'V' || input == 'v') {
             sdkCallback->onMicphoneWakeup("ni hao tian mao", 0, 0.600998834);
+        } else if (input == 'T' || input == 't') {
+            sdkCallback->onTextRecognize("来点音乐");
         } else if (input == 'Q' || input == 'q') {
             OS_LOGW(TAG, "Quit");
             break;

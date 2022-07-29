@@ -37,6 +37,7 @@ static SnowboyDetect *sGnSnowboyDetect = NULL;
 #define GENIE_LINUX_ALSA_DEVICE     "sysdefault"
 #endif
 
+// DO NOT MODIFY RECORD SETTINGS
 #define GENIE_RECORD_SAMPLE_RATE        16000
 #define GENIE_RECORD_SAMPLE_BIT         16
 #define GENIE_RECORD_CHANNEL_COUNT      1
