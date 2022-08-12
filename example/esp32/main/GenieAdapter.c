@@ -83,7 +83,9 @@ bool GnVendor_init()
     ESP_LOGI(TAG, "Start audio codec chip");
     sOutAudioCodec = audio_board_init();
     audio_hal_ctrl_codec(sOutAudioCodec->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
+#if defined CONFIG_ESP_LYRAT_MINI_V1_1_BOARD
     audio_hal_set_volume(sOutAudioCodec->adc_hal, 100); // set micphone gain
+#endif
 
     ESP_LOGI(TAG, "Start player pipeline");
     audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();

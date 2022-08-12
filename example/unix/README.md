@@ -13,4 +13,4 @@ cmake ..
 make
 ./GenieMain
 ```
-Speaking "Jarvis" or pressing enter could wakeup Genie SDK for interaction
+Speaking "Jarvis" or pressing 'V'/'v' could wakeup Genie SDK for interaction

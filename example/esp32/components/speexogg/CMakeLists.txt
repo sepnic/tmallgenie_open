@@ -12,3 +12,7 @@ register_component()
 target_compile_options(${COMPONENT_TARGET} PRIVATE
     -O3 -Wall -Werror
     -DFIXED_POINT -DUSE_KISS_FFT -DEXPORT= -DSPEEX_HAVE_SYSUTILS_ENABLED)
+
+IF(IDF_VERSION_MAJOR GREATER 3)
+    target_compile_options(${COMPONENT_TARGET} PRIVATE -Wno-error=shift-negative-value)
+ENDIF()

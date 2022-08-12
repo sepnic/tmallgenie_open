@@ -1,5 +1,9 @@
 ## How to build tmallgenie for esp32
 
+### Supported development boards
+ - ESP32-LyraT-Mini V1.2
+ - ESP32-LyraT V4.3
+
 ### Setup ESP-ADF
 
 See https://docs.espressif.com/projects/esp-adf/zh_CN/latest/get-started/index.html
@@ -10,7 +14,7 @@ My esp-adf info:
  - head: fde2bb04a9e5873cd0a1657529b14c719c03466e
  - idf_ver: v3.3
 
-My esp32 development environment backup: https://gitee.com/sepnic/esp-adf-idf-3.3_windows
+esp32 development environment backup: https://gitee.com/sepnic/esp-adf-idf-3.3_windows
 
 ### Setup the environment variants
 
