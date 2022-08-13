@@ -1,20 +1,14 @@
 ## How to build tmallgenie for esp32
 
 ### Supported development boards
- - ESP32-LyraT-Mini V1.2
+
  - ESP32-LyraT V4.3
+
+ Other official esp32 boards may also work, but have not been verified
 
 ### Setup ESP-ADF
 
 See https://docs.espressif.com/projects/esp-adf/zh_CN/latest/get-started/index.html
-
-My esp-adf info:
- - repo: https://github.com/espressif/esp-adf.git
- - branch: master
- - head: fde2bb04a9e5873cd0a1657529b14c719c03466e
- - idf_ver: v3.3
-
-esp32 development environment backup: https://gitee.com/sepnic/esp-adf-idf-3.3_windows
 
 ### Setup the environment variants
 
@@ -28,7 +22,8 @@ export IDF_TOOLS_PATH="<YOUR IDF TOOLS PATH>"
 ### Build the project
 
 ``` bash
-idf.py menuconfig # config your wifi ssid&password, audio board, and check sdkconfig.defaults as well
+# config your wifi ssid&password and audio board, check sdkconfig.defaults for details
+idf.py menuconfig
 idf.py --no-ccache build       # build
 idf.py -p <PORT> flash monitor # flash image and monitor serial message
 ```
