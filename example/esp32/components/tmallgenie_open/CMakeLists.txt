@@ -26,7 +26,7 @@ set(COMPONENT_SRCS
 
 register_component()
 
-target_compile_options(${COMPONENT_TARGET} PRIVATE -O3 -Wall -Werror -DGENIE_HAVE_SPEEXOGG_ENABLED)
+target_compile_options(${COMPONENT_TARGET} PRIVATE -O3 -Wall -DGENIE_HAVE_SPEEXOGG_ENABLED)
 
 target_link_libraries(${COMPONENT_TARGET} "-L ${TOP_DIR}/lib/${ESP_TARGET_CHIP} -L ${LITEPLAYER_DIR}/lib/${ESP_TARGET_CHIP}")
 

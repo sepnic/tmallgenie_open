@@ -28,4 +28,4 @@ set(COMPONENT_SRCS
 register_component()
 
 target_compile_options(${COMPONENT_TARGET} PRIVATE
-    -O3 -Wall -Werror -D__pnacl__ -DLITEVAD_HAVE_SYSUTILS_ENABLED)
+    -O3 -Wall -D__pnacl__ -DLITEVAD_HAVE_SYSUTILS_ENABLED)

@@ -61,8 +61,8 @@ include_directories(${SPEEX_DIR}/include)
 include_directories(${SNOWBOY_DIR}/include)
 
 # cflags: OS_LINUX, OS_ANDROID, OS_APPLE, OS_RTOS
-set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -Wall -Werror -std=gnu99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -std=c++11")
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -Wall -std=gnu99")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
 
 # genie open files
 set(TMALLGENIE_OPEN_SRC
@@ -171,7 +171,6 @@ if(ENABLE_GENIE_ADAPTER_PORTAUDIO)
     else()
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_LITTLE_ENDIAN")
     endif()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=deprecated-declarations")
 
     set(TMALLGENIE_ADAPTER_SRC
         ${PORTAUDIO_SRC}
