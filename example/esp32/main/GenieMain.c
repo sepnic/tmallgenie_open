@@ -122,20 +122,89 @@ static void Genie_Event_Handler(struct message *msg)
 
 static void Genie_Command_Handler(Genie_Domain_t domain, Genie_Command_t command, const char *payload)
 {
-    if (command == GENIE_COMMAND_GuestDeviceActivateResp) {
+    switch (command) {
+    case GENIE_COMMAND_GuestDeviceActivateResp:
+    case GENIE_COMMAND_MemberDeviceActivateResp: {
         cJSON *payloadJson = cJSON_Parse(payload);
         if (payloadJson == NULL) return;
         cJSON *uuidJson = cJSON_GetObjectItem(payloadJson, "uuid");
         cJSON *accessTokenJson = cJSON_GetObjectItem(payloadJson, "accessToken");
         char *uuid = NULL;
         char *accessToken = NULL;
-        if (uuidJson != NULL) uuid = cJSON_GetStringValue(uuidJson);
-        if (accessTokenJson != NULL) accessToken = cJSON_GetStringValue(accessTokenJson);
+        if (uuidJson != NULL)
+            uuid = cJSON_GetStringValue(uuidJson);
+        if (accessTokenJson != NULL)
+            accessToken = cJSON_GetStringValue(accessTokenJson);
         if (uuid != NULL && accessToken != NULL) {
             ESP_LOGI(TAG, "Account already authorized: uuid=%s, accessToken=%s", uuid, accessToken);
             GnVendor_updateAccount(uuid, accessToken);
         }
         cJSON_Delete(payloadJson);
+    }
+        break;
+    case GENIE_COMMAND_UserInfoResp: {
+        cJSON *payloadJson = cJSON_Parse(payload);
+        if (payloadJson == NULL) return;
+        ESP_LOGI(TAG, "UserInfoResp: payload=%s", payload);
+        cJSON *userTypeJson = cJSON_GetObjectItem(payloadJson, "userType");
+        char *userType = NULL;
+        if (userTypeJson != NULL)
+            userType = cJSON_GetStringValue(userTypeJson);
+        if (userType != NULL && strcmp(userType, "guest") == 0) {
+            cJSON *qrCodeJson = cJSON_GetObjectItem(payloadJson, "qrCode");
+            char *qrCode = NULL;
+            if (qrCodeJson != NULL)
+                qrCode = cJSON_GetStringValue(qrCodeJson);
+            if (qrCode != NULL)
+                ESP_LOGW(TAG, "User type is guest, please scan the qrCode with tmallgenie app to"
+                        " bind the device as a member: qrCode=%s", qrCode);
+        }
+        cJSON_Delete(payloadJson);
+    }
+        break;
+    default:
+        break;
+    }
+}
+
+void Genie_Status_Handler(Genie_Status_t status)
+{
+    switch (status) {
+    case GENIE_STATUS_NetworkDisconnected:
+        ESP_LOGI(TAG, "-->NetworkDisconnected");
+        break;
+    case GENIE_STATUS_NetworkConnected:
+        ESP_LOGI(TAG, "-->NetworkConnected");
+        break;
+    case GENIE_STATUS_GatewayDisconnected:
+        ESP_LOGI(TAG, "-->GatewayDisconnected");
+        break;
+    case GENIE_STATUS_GatewayConnected:
+        ESP_LOGI(TAG, "-->GatewayConnected");
+        break;
+    case GENIE_STATUS_Unauthorized:
+        ESP_LOGI(TAG, "-->Unauthorized");
+        break;
+    case GENIE_STATUS_Authorized:
+        ESP_LOGI(TAG, "-->Authorized");
+        break;
+    case GENIE_STATUS_SpeakerUnmuted:
+        ESP_LOGI(TAG, "-->SpeakerUnmuted");
+        break;
+    case GENIE_STATUS_SpeakerMuted:
+        ESP_LOGI(TAG, "-->SpeakerMuted");
+        break;
+    case GENIE_STATUS_MicphoneWakeup:
+        ESP_LOGI(TAG, "-->MicphoneWakeup");
+        break;
+    case GENIE_STATUS_MicphoneStarted:
+        ESP_LOGI(TAG, "-->MicphoneStarted");
+        break;
+    case GENIE_STATUS_MicphoneStopped:
+        ESP_LOGI(TAG, "-->MicphoneStopped");
+        break;
+    default:
+        break;
     }
 }
 
@@ -151,6 +220,10 @@ static void *Genie_Main_Entry(void *arg)
     }
     if (!GenieSdk_Register_CommandListener(Genie_Command_Handler)) {
         ESP_LOGE(TAG, "Failed to GenieSdk_Register_CommandListener");
+        goto __exit;
+    }
+    if (!GenieSdk_Register_StatusListener(Genie_Status_Handler)) {
+        ESP_LOGE(TAG, "Failed to GenieSdk_Register_StatusListener");
         goto __exit;
     }
     if (!GenieSdk_Start()) {

@@ -79,6 +79,7 @@ typedef struct {
     bool isNetworkDisconnected;
     bool isGatewayDisconnected;
     bool isAccountUnauthorized;
+    bool isMicphoneActive;
 } GnSdk_Priv_t;
 
 typedef struct {
@@ -180,6 +181,13 @@ static void GenieSdk_StatusListener(Genie_Status_t status)
             sGnSdk.isAccountUnauthorized = true;
         }
         break;
+    case GENIE_STATUS_MicphoneWakeup:
+    case GENIE_STATUS_MicphoneStarted:
+        sGnSdk.isMicphoneActive = true;
+        break;
+    case GENIE_STATUS_MicphoneStopped:
+        sGnSdk.isMicphoneActive = false;
+        break;
     default:
         break;
     }
@@ -225,9 +233,15 @@ static void GenieSdk_OnSpeakerMutedChanged(bool muted)
     sGnSdk.serviceCallback->onSpeakerMutedChanged(muted);
 }
 
+static void GenieSdk_OnQueryUserInfo()
+{
+    if (GenieSdk_IsGatewayConnected())
+        sGnSdk.serviceCallback->onQueryUserInfo();
+}
+
 static void GenieSdk_OnTextRecognize(const char *inputText)
 {
-    if (inputText != NULL && GenieSdk_IsGatewayConnected())
+    if (inputText != NULL && GenieSdk_IsGatewayConnected() && !sGnSdk.isMicphoneActive)
         sGnSdk.serviceCallback->onTextRecognize(inputText);
 }
 
@@ -252,6 +266,7 @@ bool GenieSdk_Init(GnVendor_Wrapper_t *adapter)
     sGnCallback.onMicphoneSilence       = GenieSdk_OnMicphoneSilence;
     sGnCallback.onSpeakerVolumeChanged  = GenieSdk_OnSpeakerVolumeChanged;
     sGnCallback.onSpeakerMutedChanged   = GenieSdk_OnSpeakerMutedChanged;
+    sGnCallback.onQueryUserInfo         = GenieSdk_OnQueryUserInfo;
     sGnCallback.onTextRecognize         = GenieSdk_OnTextRecognize;
     sGnCallback.onNewPrompt             = GenieSdk_OnNewPrompt;
 

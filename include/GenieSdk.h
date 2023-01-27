@@ -76,6 +76,7 @@ typedef struct {
     void (*onSpeakerMutedChanged)(bool muted);
 
     // user request
+    void (*onQueryUserInfo)();
     void (*onTextRecognize)(const char *inputText);
     void (*onNewPrompt)(const char *url);
 } GenieSdk_Callback_t;

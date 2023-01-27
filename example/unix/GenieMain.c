@@ -27,20 +27,89 @@
 
 static void Genie_Command_Handler(Genie_Domain_t domain, Genie_Command_t command, const char *payload)
 {
-    if (command == GENIE_COMMAND_GuestDeviceActivateResp) {
+    switch (command) {
+    case GENIE_COMMAND_GuestDeviceActivateResp:
+    case GENIE_COMMAND_MemberDeviceActivateResp: {
         cJSON *payloadJson = cJSON_Parse(payload);
         if (payloadJson == NULL) return;
         cJSON *uuidJson = cJSON_GetObjectItem(payloadJson, "uuid");
         cJSON *accessTokenJson = cJSON_GetObjectItem(payloadJson, "accessToken");
         char *uuid = NULL;
         char *accessToken = NULL;
-        if (uuidJson != NULL) uuid = cJSON_GetStringValue(uuidJson);
-        if (accessTokenJson != NULL) accessToken = cJSON_GetStringValue(accessTokenJson);
+        if (uuidJson != NULL)
+            uuid = cJSON_GetStringValue(uuidJson);
+        if (accessTokenJson != NULL)
+            accessToken = cJSON_GetStringValue(accessTokenJson);
         if (uuid != NULL && accessToken != NULL) {
             OS_LOGI(TAG, "Account already authorized: uuid=%s, accessToken=%s", uuid, accessToken);
             GnVendor_updateAccount(uuid, accessToken);
         }
         cJSON_Delete(payloadJson);
+    }
+        break;
+    case GENIE_COMMAND_UserInfoResp: {
+        cJSON *payloadJson = cJSON_Parse(payload);
+        if (payloadJson == NULL) return;
+        OS_LOGI(TAG, "UserInfoResp: payload=%s", payload);
+        cJSON *userTypeJson = cJSON_GetObjectItem(payloadJson, "userType");
+        char *userType = NULL;
+        if (userTypeJson != NULL)
+            userType = cJSON_GetStringValue(userTypeJson);
+        if (userType != NULL && strcmp(userType, "guest") == 0) {
+            cJSON *qrCodeJson = cJSON_GetObjectItem(payloadJson, "qrCode");
+            char *qrCode = NULL;
+            if (qrCodeJson != NULL)
+                qrCode = cJSON_GetStringValue(qrCodeJson);
+            if (qrCode != NULL)
+                OS_LOGW(TAG, "User type is guest, please scan the qrCode with tmallgenie app to"
+                        " bind the device as a member: qrCode=%s", qrCode);
+        }
+        cJSON_Delete(payloadJson);
+    }
+        break;
+    default:
+        break;
+    }
+}
+
+void Genie_Status_Handler(Genie_Status_t status)
+{
+    switch (status) {
+    case GENIE_STATUS_NetworkDisconnected:
+        OS_LOGI(TAG, "-->NetworkDisconnected");
+        break;
+    case GENIE_STATUS_NetworkConnected:
+        OS_LOGI(TAG, "-->NetworkConnected");
+        break;
+    case GENIE_STATUS_GatewayDisconnected:
+        OS_LOGI(TAG, "-->GatewayDisconnected");
+        break;
+    case GENIE_STATUS_GatewayConnected:
+        OS_LOGI(TAG, "-->GatewayConnected");
+        break;
+    case GENIE_STATUS_Unauthorized:
+        OS_LOGI(TAG, "-->Unauthorized");
+        break;
+    case GENIE_STATUS_Authorized:
+        OS_LOGI(TAG, "-->Authorized");
+        break;
+    case GENIE_STATUS_SpeakerUnmuted:
+        OS_LOGI(TAG, "-->SpeakerUnmuted");
+        break;
+    case GENIE_STATUS_SpeakerMuted:
+        OS_LOGI(TAG, "-->SpeakerMuted");
+        break;
+    case GENIE_STATUS_MicphoneWakeup:
+        OS_LOGI(TAG, "-->MicphoneWakeup");
+        break;
+    case GENIE_STATUS_MicphoneStarted:
+        OS_LOGI(TAG, "-->MicphoneStarted");
+        break;
+    case GENIE_STATUS_MicphoneStopped:
+        OS_LOGI(TAG, "-->MicphoneStopped");
+        break;
+    default:
+        break;
     }
 }
 
@@ -84,6 +153,10 @@ int main(int argc, char **argv)
         OS_LOGE(TAG, "Failed to GenieSdk_Register_CommandListener");
         goto __exit;
     }
+    if (!GenieSdk_Register_StatusListener(Genie_Status_Handler)) {
+        OS_LOGE(TAG, "Failed to GenieSdk_Register_StatusListener");
+        goto __exit;
+    }
     if (!GenieSdk_Start()) {
         OS_LOGE(TAG, "Failed to GenieSdk_Start");
         goto __exit;
@@ -98,11 +171,14 @@ int main(int argc, char **argv)
         OS_LOGW(TAG, "  Q|q   : quit");
         OS_LOGW(TAG, "  T|t   : trigger text recognition");
         OS_LOGW(TAG, "  V|v   : trigger voice interaction");
+        OS_LOGW(TAG, "  U|u   : query user info");
         input = getc(stdin);
         if (input == 'V' || input == 'v') {
             sdkCallback->onMicphoneWakeup("ni hao tian mao", 0, 0.600998834);
         } else if (input == 'T' || input == 't') {
             sdkCallback->onTextRecognize("来点音乐");
+        } else if (input == 'U' || input == 'u') {
+            sdkCallback->onQueryUserInfo();
         } else if (input == 'Q' || input == 'q') {
             OS_LOGW(TAG, "Quit");
             break;

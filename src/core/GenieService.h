@@ -57,6 +57,7 @@ typedef struct {
     void (*onPlayerFailed)();
 
     // user request event
+    void (*onQueryUserInfo)();
     void (*onTextRecognize)(const char *inputText);
     void (*onExpectSpeech)();
 } GnService_Callback_t;
