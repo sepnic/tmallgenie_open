@@ -2,7 +2,7 @@
 
 ### Environment dependencies
 
-Ubuntu/raspberry-pi：`sudo apt-get install libatlas-base-dev libasound2-dev`
+Ubuntu/raspberry-pi：`sudo apt-get install cmake build-essential libatlas-base-dev libasound2-dev`
 
 ### Build the project and run
 
@@ -13,4 +13,4 @@ cmake ..
 make
 ./GenieMain
 ```
-Speaking "Jarvis" or pressing 'V'/'v' could wakeup Genie SDK for interaction
+Speaking "Jarvis" or pressing 'V'/'v' will wakeup Genie SDK for interaction

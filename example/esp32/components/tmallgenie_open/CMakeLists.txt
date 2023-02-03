@@ -30,11 +30,14 @@ target_compile_options(${COMPONENT_TARGET} PRIVATE -O3 -Wall -DGENIE_HAVE_SPEEXO
 
 target_link_libraries(${COMPONENT_TARGET} "-L ${TOP_DIR}/lib/${ESP_TARGET_CHIP} -L ${LITEPLAYER_DIR}/lib/${ESP_TARGET_CHIP}")
 
-IF(IDF_VERSION_MAJOR GREATER 3)
-    add_prebuilt_library(tmallgenie_core "${TOP_DIR}/lib/${ESP_TARGET_CHIP}/libtmallgenie_core-v4.4.a"
+IF((IDF_VERSION_MAJOR GREATER 4) OR (IDF_VERSION_MAJOR EQUAL 4))
+    add_prebuilt_library(tmallgenie_core "${TOP_DIR}/lib/${ESP_TARGET_CHIP}/libtmallgenie_core.a"
             PRIV_REQUIRES tmallgenie_open)
     add_prebuilt_library(liteplayer_core "${LITEPLAYER_DIR}/lib/${ESP_TARGET_CHIP}/libliteplayer_core.a"
             PRIV_REQUIRES tmallgenie_open)
+ELSE()
+    message(FATAL_ERROR "Only support IDF V4.4 and above, abort....")
+    return()
 ENDIF()
 
 target_link_libraries(${COMPONENT_TARGET} "-Wl,--start-group" tmallgenie_core liteplayer_core "-Wl,--end-group")

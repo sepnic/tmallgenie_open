@@ -4,11 +4,13 @@
 
  - ESP32-LyraT V4.3
 
- Other official esp32 boards may also work, but have not been verified
+It may work with other official esp32 boards, but has not been verified
 
 ### Setup ESP-ADF
 
 See https://docs.espressif.com/projects/esp-adf/zh_CN/latest/get-started/index.html
+
+Only support IDF V4.4 and above
 
 ### Setup the environment variants
 
@@ -27,4 +29,4 @@ idf.py menuconfig
 idf.py --no-ccache build       # build
 idf.py -p <PORT> flash monitor # flash image and monitor serial message
 ```
-Speaking "Hi LeXin" or pressing 'REC' key could wakeup Genie SDK for interaction
+Speaking "Hi LeXin" or pressing 'REC' key will wakeup Genie SDK for interaction
