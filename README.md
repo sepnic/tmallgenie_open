@@ -96,5 +96,5 @@ Unix-like（macosx/ubuntu/raspberry-pi）系统没有这些限制，ESP32 平台
 1. MacOSX/Ubuntu demo 监听网络状态
 2. Android demo
 3. 语音前处理，如回音消除、噪音抑制，只有前端语音干净了，KWD/VAD/ASR 的处理结果才更准确
-4. Genie 支持会员激活（目前都是走访客激活），以便支持 IoT 等服务
+4. ~~Genie 支持会员激活（目前都是走访客激活），以便支持 IoT 等服务~~ [Guest 用户模式下，通过 QueryUserInfo 调用会得到一个 QRCode link，我们可以用这个链接生成一个二维码，最后用天猫精灵 app 扫描该二维码，按照指引操作就能绑定设备为会员了]
 5. 设备智能配网 SmartConfig
