@@ -140,8 +140,10 @@ bool GnVoiceEngine_init()
         GENIE_RECORD_READ_SIZE/(GENIE_RECORD_CHANNEL_COUNT*GENIE_RECORD_SAMPLE_BIT/8);
     PaStream *inStream = NULL;
     PaStreamParameters inParameters;
-	inParameters.device = Pa_GetDefaultInputDevice();
-	inParameters.channelCount = GENIE_RECORD_CHANNEL_COUNT;
+    inParameters.device = Pa_GetDefaultInputDevice();
+    if (inParameters.device == paNoDevice)
+        return false;
+    inParameters.channelCount = GENIE_RECORD_CHANNEL_COUNT;
     switch (GENIE_RECORD_SAMPLE_BIT) {
     case 32:
         inParameters.sampleFormat = paInt32;
@@ -154,15 +156,15 @@ bool GnVoiceEngine_init()
         inParameters.sampleFormat = paInt16;
         break;
     }
-	inParameters.suggestedLatency =
+    inParameters.suggestedLatency =
             Pa_GetDeviceInfo(inParameters.device)->defaultLowInputLatency;
-	inParameters.hostApiSpecificStreamInfo = NULL;
-	if (Pa_OpenStream(&inStream, &inParameters, NULL,
+    inParameters.hostApiSpecificStreamInfo = NULL;
+    if (Pa_OpenStream(&inStream, &inParameters, NULL,
             GENIE_RECORD_SAMPLE_RATE, framesNeed, paFramesPerBufferUnspecified,
             GnVoiceEngine_inStreamCallback, NULL) != paNoError)
         return false;
-	if (Pa_StartStream(inStream) != paNoError)
-		return false;
+    if (Pa_StartStream(inStream) != paNoError)
+        return false;
     return true;
 }
 

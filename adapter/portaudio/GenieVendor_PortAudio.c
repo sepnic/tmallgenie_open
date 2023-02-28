@@ -211,8 +211,10 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
     portaudio->bitsPerSample = bitsPerSample;
 
     PaStreamParameters ouputParameters;
-	ouputParameters.device = Pa_GetDefaultOutputDevice();
-	ouputParameters.channelCount = channelCount;
+    ouputParameters.device = Pa_GetDefaultOutputDevice();
+    if (ouputParameters.device == paNoDevice)
+        goto __error_open;
+    ouputParameters.channelCount = channelCount;
     switch (bitsPerSample) {
     case 32:
         ouputParameters.sampleFormat = paInt32;
@@ -225,14 +227,14 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
         ouputParameters.sampleFormat = paInt16;
         break;
     }
-	ouputParameters.suggestedLatency =
+    ouputParameters.suggestedLatency =
             Pa_GetDeviceInfo(ouputParameters.device)->defaultLowOutputLatency;
-	ouputParameters.hostApiSpecificStreamInfo = NULL;
-	if (Pa_OpenStream(&portaudio->outStream, NULL, &ouputParameters,
+    ouputParameters.hostApiSpecificStreamInfo = NULL;
+    if (Pa_OpenStream(&portaudio->outStream, NULL, &ouputParameters,
             sampleRate, 512, paFramesPerBufferUnspecified, NULL, NULL) != paNoError)
         goto __error_open;
-	if (Pa_StartStream(portaudio->outStream) != paNoError)
-		goto __error_open;
+    if (Pa_StartStream(portaudio->outStream) != paNoError)
+        goto __error_open;
     return portaudio;
 
 __error_open:
