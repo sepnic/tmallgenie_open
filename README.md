@@ -2,7 +2,7 @@
 - 简单易用：平台层接入简单，适配 [GenieVendorAdapter](https://github.com/sepnic/tmallgenie_open/blob/master/include/GenieVendorAdapter.h) 接口即可；应用层使用简单，接口见 [GenieSdk](https://github.com/sepnic/tmallgenie_open/blob/master/include/GenieSdk.h)，使用范例见 [GenieMain](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/GenieMain.c)
 - 低延时：从说话结束到服务端响应的时间少于1秒，达到秒回的效果，与阿里官方智能音箱一样的交互体验
 - 低开销：性能和内存开销极低，可以在各类 RTOS 系统上落地，如 ESP32 demo 为例，CPU 主频为 160MHz，堆内存开销 400KB 以内（还包括了 256KB 的音乐播放器缓冲区和 32KB 的 TTS 播放器缓冲区）
-- 跨平台：已适配 MacOSX、Ubuntu、ESP32、Raspberry-pi 平台，后续看需求支持更多的平台
+- 跨平台：已适配 MacOSX、Ubuntu、Android、ESP32、Raspberry-pi 平台，后续看需求支持更多的平台
 
 **演示视频：**
  - [MacOSX 精灵语音助手](https://www.bilibili.com/video/BV1Na411q7o8)
@@ -93,8 +93,8 @@ Unix-like（macosx/ubuntu/raspberry-pi）系统没有这些限制，ESP32 平台
 现在 example 代码中的 bizType/bizGroup/bizSecret 均为空，事实上这些客户信息需要到 [天猫精灵AI平台](https://product.aligenie.com/) 申请（注意需要企业认证后才能操作）。如果已有私有的 biz，且确保该 biz 不会用于正式产品，则建议填入这些信息；为空的话，SDK 会使用默认的一组 biz，但过多的人共用一组 biz，可能会被服务端检测到异常并封杀。
 
 ## TODO
-1. MacOSX/Ubuntu demo 监听网络状态
-2. Android demo
+1. MacOSX/Ubuntu/Android demo 监听网络状态
+2. ~~Android demo~~ [Done]
 3. 语音前处理，如回音消除、噪音抑制，只有前端语音干净了，KWD/VAD/ASR 的处理结果才更准确
 4. ~~Genie 支持会员激活（目前都是走访客激活），以便支持 IoT 等服务~~ [Guest 用户模式下，通过 QueryUserInfo 调用会得到一个 QRCode link，我们可以用这个链接生成一个二维码，最后用天猫精灵 app 扫描该二维码，按照指引操作就能绑定设备为会员了]
 5. 设备智能配网 SmartConfig
