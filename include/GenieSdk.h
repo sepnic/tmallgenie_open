@@ -85,6 +85,10 @@ typedef void (*GenieCommandListener)(Genie_Domain_t domain, Genie_Command_t comm
 
 typedef void (*GenieStatusListener)(Genie_Status_t status);
 
+typedef void (*GenieAsrResultListener)(const char *result);
+
+typedef void (*GenieNluResultListener)(const char *result);
+
 bool GenieSdk_Init(GnVendor_Wrapper_t *adapter);
 
 bool GenieSdk_Get_Callback(GenieSdk_Callback_t **callback);
@@ -96,6 +100,14 @@ void GenieSdk_Unregister_CommandListener(GenieCommandListener listener);
 bool GenieSdk_Register_StatusListener(GenieStatusListener listener);
 
 void GenieSdk_Unregister_StatusListener(GenieStatusListener listener);
+
+bool GenieSdk_Register_AsrResultListener(GenieAsrResultListener listener);
+
+void GenieSdk_Unregister_AsrResultListener(GenieAsrResultListener listener);
+
+bool GenieSdk_Register_NluResultListener(GenieNluResultListener listener);
+
+void GenieSdk_Unregister_NluResultListener(GenieNluResultListener listener);
 
 bool GenieSdk_Start();
 

@@ -136,7 +136,7 @@ static void Genie_Command_Handler(Genie_Domain_t domain, Genie_Command_t command
         if (accessTokenJson != NULL)
             accessToken = cJSON_GetStringValue(accessTokenJson);
         if (uuid != NULL && accessToken != NULL) {
-            ESP_LOGI(TAG, "Account already authorized: uuid=%s, accessToken=%s", uuid, accessToken);
+            ESP_LOGW(TAG, "Account already authorized: uuid=%s, accessToken=%s", uuid, accessToken);
             GnVendor_updateAccount(uuid, accessToken);
         }
         cJSON_Delete(payloadJson);
@@ -145,7 +145,7 @@ static void Genie_Command_Handler(Genie_Domain_t domain, Genie_Command_t command
     case GENIE_COMMAND_UserInfoResp: {
         cJSON *payloadJson = cJSON_Parse(payload);
         if (payloadJson == NULL) return;
-        ESP_LOGI(TAG, "UserInfoResp: payload=%s", payload);
+        ESP_LOGW(TAG, "UserInfoResp: payload=%s", payload);
         cJSON *userTypeJson = cJSON_GetObjectItem(payloadJson, "userType");
         char *userType = NULL;
         if (userTypeJson != NULL)
@@ -171,41 +171,51 @@ void Genie_Status_Handler(Genie_Status_t status)
 {
     switch (status) {
     case GENIE_STATUS_NetworkDisconnected:
-        ESP_LOGI(TAG, "-->NetworkDisconnected");
+        ESP_LOGW(TAG, "-->NetworkDisconnected");
         break;
     case GENIE_STATUS_NetworkConnected:
-        ESP_LOGI(TAG, "-->NetworkConnected");
+        ESP_LOGW(TAG, "-->NetworkConnected");
         break;
     case GENIE_STATUS_GatewayDisconnected:
-        ESP_LOGI(TAG, "-->GatewayDisconnected");
+        ESP_LOGW(TAG, "-->GatewayDisconnected");
         break;
     case GENIE_STATUS_GatewayConnected:
-        ESP_LOGI(TAG, "-->GatewayConnected");
+        ESP_LOGW(TAG, "-->GatewayConnected");
         break;
     case GENIE_STATUS_Unauthorized:
-        ESP_LOGI(TAG, "-->Unauthorized");
+        ESP_LOGW(TAG, "-->Unauthorized");
         break;
     case GENIE_STATUS_Authorized:
-        ESP_LOGI(TAG, "-->Authorized");
+        ESP_LOGW(TAG, "-->Authorized");
         break;
     case GENIE_STATUS_SpeakerUnmuted:
-        ESP_LOGI(TAG, "-->SpeakerUnmuted");
+        ESP_LOGW(TAG, "-->SpeakerUnmuted");
         break;
     case GENIE_STATUS_SpeakerMuted:
-        ESP_LOGI(TAG, "-->SpeakerMuted");
+        ESP_LOGW(TAG, "-->SpeakerMuted");
         break;
     case GENIE_STATUS_MicphoneWakeup:
-        ESP_LOGI(TAG, "-->MicphoneWakeup");
+        ESP_LOGW(TAG, "-->MicphoneWakeup");
         break;
     case GENIE_STATUS_MicphoneStarted:
-        ESP_LOGI(TAG, "-->MicphoneStarted");
+        ESP_LOGW(TAG, "-->MicphoneStarted");
         break;
     case GENIE_STATUS_MicphoneStopped:
-        ESP_LOGI(TAG, "-->MicphoneStopped");
+        ESP_LOGW(TAG, "-->MicphoneStopped");
         break;
     default:
         break;
     }
+}
+
+static void Genie_AsrResult_Handler(const char *result)
+{
+    ESP_LOGW(TAG, "AsrResult: %s", result);
+}
+
+static void Genie_NluResult_Handler(const char *result)
+{
+    ESP_LOGW(TAG, "NluResult: %s", result);
 }
 
 static void *Genie_Main_Entry(void *arg)
@@ -224,6 +234,14 @@ static void *Genie_Main_Entry(void *arg)
     }
     if (!GenieSdk_Register_StatusListener(Genie_Status_Handler)) {
         ESP_LOGE(TAG, "Failed to GenieSdk_Register_StatusListener");
+        goto __exit;
+    }
+    if (!GenieSdk_Register_AsrResultListener(Genie_AsrResult_Handler)) {
+        ESP_LOGE(TAG, "Failed to GenieSdk_Register_AsrResultListener");
+        goto __exit;
+    }
+    if (!GenieSdk_Register_NluResultListener(Genie_NluResult_Handler)) {
+        ESP_LOGE(TAG, "Failed to GenieSdk_Register_NluResultListener");
         goto __exit;
     }
     if (!GenieSdk_Start()) {
@@ -260,6 +278,10 @@ __exit:
         sSdkLooper = NULL;
     }
     GenieSdk_Stop();
+    GenieSdk_Unregister_CommandListener(Genie_Command_Handler);
+    GenieSdk_Unregister_StatusListener(Genie_Status_Handler);
+    GenieSdk_Unregister_AsrResultListener(Genie_AsrResult_Handler);
+    GenieSdk_Unregister_NluResultListener(Genie_NluResult_Handler);
     return NULL;
 }
 

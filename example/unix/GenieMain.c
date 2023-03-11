@@ -41,7 +41,7 @@ static void Genie_Command_Handler(Genie_Domain_t domain, Genie_Command_t command
         if (accessTokenJson != NULL)
             accessToken = cJSON_GetStringValue(accessTokenJson);
         if (uuid != NULL && accessToken != NULL) {
-            OS_LOGI(TAG, "Account already authorized: uuid=%s, accessToken=%s", uuid, accessToken);
+            OS_LOGW(TAG, "Account already authorized: uuid=%s, accessToken=%s", uuid, accessToken);
             GnVendor_updateAccount(uuid, accessToken);
         }
         cJSON_Delete(payloadJson);
@@ -50,7 +50,7 @@ static void Genie_Command_Handler(Genie_Domain_t domain, Genie_Command_t command
     case GENIE_COMMAND_UserInfoResp: {
         cJSON *payloadJson = cJSON_Parse(payload);
         if (payloadJson == NULL) return;
-        OS_LOGI(TAG, "UserInfoResp: payload=%s", payload);
+        OS_LOGW(TAG, "UserInfoResp: payload=%s", payload);
         cJSON *userTypeJson = cJSON_GetObjectItem(payloadJson, "userType");
         char *userType = NULL;
         if (userTypeJson != NULL)
@@ -76,41 +76,51 @@ void Genie_Status_Handler(Genie_Status_t status)
 {
     switch (status) {
     case GENIE_STATUS_NetworkDisconnected:
-        OS_LOGI(TAG, "-->NetworkDisconnected");
+        OS_LOGW(TAG, "-->NetworkDisconnected");
         break;
     case GENIE_STATUS_NetworkConnected:
-        OS_LOGI(TAG, "-->NetworkConnected");
+        OS_LOGW(TAG, "-->NetworkConnected");
         break;
     case GENIE_STATUS_GatewayDisconnected:
-        OS_LOGI(TAG, "-->GatewayDisconnected");
+        OS_LOGW(TAG, "-->GatewayDisconnected");
         break;
     case GENIE_STATUS_GatewayConnected:
-        OS_LOGI(TAG, "-->GatewayConnected");
+        OS_LOGW(TAG, "-->GatewayConnected");
         break;
     case GENIE_STATUS_Unauthorized:
-        OS_LOGI(TAG, "-->Unauthorized");
+        OS_LOGW(TAG, "-->Unauthorized");
         break;
     case GENIE_STATUS_Authorized:
-        OS_LOGI(TAG, "-->Authorized");
+        OS_LOGW(TAG, "-->Authorized");
         break;
     case GENIE_STATUS_SpeakerUnmuted:
-        OS_LOGI(TAG, "-->SpeakerUnmuted");
+        OS_LOGW(TAG, "-->SpeakerUnmuted");
         break;
     case GENIE_STATUS_SpeakerMuted:
-        OS_LOGI(TAG, "-->SpeakerMuted");
+        OS_LOGW(TAG, "-->SpeakerMuted");
         break;
     case GENIE_STATUS_MicphoneWakeup:
-        OS_LOGI(TAG, "-->MicphoneWakeup");
+        OS_LOGW(TAG, "-->MicphoneWakeup");
         break;
     case GENIE_STATUS_MicphoneStarted:
-        OS_LOGI(TAG, "-->MicphoneStarted");
+        OS_LOGW(TAG, "-->MicphoneStarted");
         break;
     case GENIE_STATUS_MicphoneStopped:
-        OS_LOGI(TAG, "-->MicphoneStopped");
+        OS_LOGW(TAG, "-->MicphoneStopped");
         break;
     default:
         break;
     }
+}
+
+static void Genie_AsrResult_Handler(const char *result)
+{
+    OS_LOGW(TAG, "AsrResult: %s", result);
+}
+
+static void Genie_NluResult_Handler(const char *result)
+{
+    OS_LOGW(TAG, "NluResult: %s", result);
 }
 
 int main(int argc, char **argv)
@@ -157,6 +167,14 @@ int main(int argc, char **argv)
         OS_LOGE(TAG, "Failed to GenieSdk_Register_StatusListener");
         goto __exit;
     }
+    if (!GenieSdk_Register_AsrResultListener(Genie_AsrResult_Handler)) {
+        OS_LOGE(TAG, "Failed to GenieSdk_Register_AsrResultListener");
+        goto __exit;
+    }
+    if (!GenieSdk_Register_NluResultListener(Genie_NluResult_Handler)) {
+        OS_LOGE(TAG, "Failed to GenieSdk_Register_NluResultListener");
+        goto __exit;
+    }
     if (!GenieSdk_Start()) {
         OS_LOGE(TAG, "Failed to GenieSdk_Start");
         goto __exit;
@@ -187,6 +205,10 @@ int main(int argc, char **argv)
 
 __exit:
     GenieSdk_Stop();
+    GenieSdk_Unregister_CommandListener(Genie_Command_Handler);
+    GenieSdk_Unregister_StatusListener(Genie_Status_Handler);
+    GenieSdk_Unregister_AsrResultListener(Genie_AsrResult_Handler);
+    GenieSdk_Unregister_NluResultListener(Genie_NluResult_Handler);
     OS_MEMORY_DUMP();
     return 0;
 }

@@ -74,7 +74,10 @@ typedef struct {
     GnService_Callback_t *serviceCallback;
     struct listnode commandListenerList;
     struct listnode statusListenerList;
+    struct listnode asrResultListenerList;
+    struct listnode nluResultListenerList;
     bool isStarted;
+    bool isWaitingNluResult;
 
     bool isNetworkDisconnected;
     bool isGatewayDisconnected;
@@ -91,6 +94,16 @@ typedef struct {
     GenieStatusListener statusListener;
     struct listnode listnode;
 } GnSdk_StatusListenerNode_t;
+
+typedef struct {
+    GenieAsrResultListener asrResultListener;
+    struct listnode listnode;
+} GnSdk_AsrResultListenerNode_t;
+
+typedef struct {
+    GenieNluResultListener nluResultListener;
+    struct listnode listnode;
+} GnSdk_NluResultListenerNode_t;
 
 static GnSdk_Priv_t         sGnSdk;
 static GenieSdk_Callback_t  sGnCallback;
@@ -119,6 +132,48 @@ static bool GenieSdk_IsGatewayConnected()
 static void GenieSdk_CommandListener(Genie_Domain_t domain, Genie_Command_t command, const char *payload)
 {
     switch (command) {
+    case GENIE_COMMAND_ListenResult: {
+        cJSON *payloadJson = cJSON_Parse(payload);
+        if (payloadJson == NULL) break;
+        cJSON *isLastJson = cJSON_GetObjectItem(payloadJson, "isLast");
+        cJSON *outputTextJson = cJSON_GetObjectItem(payloadJson, "outputText");
+        if (isLastJson != NULL && cJSON_IsTrue(isLastJson) &&
+            outputTextJson != NULL && cJSON_IsString(outputTextJson)) {
+            sGnSdk.isWaitingNluResult = true;
+            os_mutex_lock(sGnSdk.lock);
+            struct listnode *item;
+            list_for_each(item, &sGnSdk.asrResultListenerList) {
+                GnSdk_AsrResultListenerNode_t *node =
+                        listnode_to_item(item, GnSdk_AsrResultListenerNode_t, listnode);
+                node->asrResultListener(cJSON_GetStringValue(outputTextJson));
+            }
+            os_mutex_unlock(sGnSdk.lock);
+        } else {
+            sGnSdk.isWaitingNluResult = false;
+        }
+        cJSON_Delete(payloadJson);
+    }
+        break;
+    case GENIE_COMMAND_Speak: {
+        if (sGnSdk.isWaitingNluResult) {
+            sGnSdk.isWaitingNluResult = false;
+            cJSON *payloadJson = cJSON_Parse(payload);
+            if (payloadJson == NULL) break;
+            cJSON *textJson = cJSON_GetObjectItem(payloadJson, "text");
+            if (textJson != NULL && cJSON_IsString(textJson)) {
+                os_mutex_lock(sGnSdk.lock);
+                struct listnode *item;
+                list_for_each(item, &sGnSdk.nluResultListenerList) {
+                    GnSdk_NluResultListenerNode_t *node =
+                            listnode_to_item(item, GnSdk_NluResultListenerNode_t, listnode);
+                    node->nluResultListener(cJSON_GetStringValue(textJson));
+                }
+                os_mutex_unlock(sGnSdk.lock);
+            }
+            cJSON_Delete(payloadJson);
+        }
+    }
+        break;
     case GENIE_COMMAND_Volume: {
         if (sGnSdk.adapter.setSpeakerVolume == NULL)
             break;
@@ -272,6 +327,8 @@ bool GenieSdk_Init(GnVendor_Wrapper_t *adapter)
 
     list_init(&sGnSdk.commandListenerList);
     list_init(&sGnSdk.statusListenerList);
+    list_init(&sGnSdk.asrResultListenerList);
+    list_init(&sGnSdk.nluResultListenerList);
 
     if ((sGnSdk.lock = os_mutex_create()) == NULL)
         goto __error_init;
@@ -425,6 +482,106 @@ void GenieSdk_Unregister_StatusListener(GenieStatusListener listener)
     list_for_each_safe(item, tmp, &sGnSdk.statusListenerList) {
         node = listnode_to_item(item, GnSdk_StatusListenerNode_t, listnode);
         if (node->statusListener == listener) {
+            list_remove(item);
+            OS_FREE(node);
+            break;
+        }
+    }
+    os_mutex_unlock(sGnSdk.lock);
+}
+
+bool GenieSdk_Register_AsrResultListener(GenieAsrResultListener listener)
+{
+    if (!sGnInited || listener == NULL) {
+        OS_LOGE(TAG, "Genie Sdk is NOT inited");
+        return false;
+    }
+
+    os_mutex_lock(sGnSdk.lock);
+    GnSdk_AsrResultListenerNode_t *node;
+    struct listnode *item;
+    bool found = false;
+    list_for_each(item, &sGnSdk.asrResultListenerList) {
+        node = listnode_to_item(item, GnSdk_AsrResultListenerNode_t, listnode);
+        if (node->asrResultListener == listener)
+            found = true;
+    }
+    if (!found) {
+        node = OS_MALLOC(sizeof(GnSdk_AsrResultListenerNode_t));
+        if (node == NULL) {
+            os_mutex_unlock(sGnSdk.lock);
+            return false;
+        }
+        node->asrResultListener = listener;
+        list_add_tail(&sGnSdk.asrResultListenerList, &node->listnode);
+    }
+    os_mutex_unlock(sGnSdk.lock);
+    return true;
+}
+
+void GenieSdk_Unregister_AsrResultListener(GenieAsrResultListener listener)
+{
+    if (!sGnInited || listener == NULL) {
+        OS_LOGE(TAG, "Genie Sdk is NOT inited");
+        return;
+    }
+
+    os_mutex_lock(sGnSdk.lock);
+    GnSdk_AsrResultListenerNode_t *node;
+    struct listnode *item, *tmp;
+    list_for_each_safe(item, tmp, &sGnSdk.asrResultListenerList) {
+        node = listnode_to_item(item, GnSdk_AsrResultListenerNode_t, listnode);
+        if (node->asrResultListener == listener) {
+            list_remove(item);
+            OS_FREE(node);
+            break;
+        }
+    }
+    os_mutex_unlock(sGnSdk.lock);
+}
+
+bool GenieSdk_Register_NluResultListener(GenieNluResultListener listener)
+{
+    if (!sGnInited || listener == NULL) {
+        OS_LOGE(TAG, "Genie Sdk is NOT inited");
+        return false;
+    }
+
+    os_mutex_lock(sGnSdk.lock);
+    GnSdk_NluResultListenerNode_t *node;
+    struct listnode *item;
+    bool found = false;
+    list_for_each(item, &sGnSdk.nluResultListenerList) {
+        node = listnode_to_item(item, GnSdk_NluResultListenerNode_t, listnode);
+        if (node->nluResultListener == listener)
+            found = true;
+    }
+    if (!found) {
+        node = OS_MALLOC(sizeof(GnSdk_NluResultListenerNode_t));
+        if (node == NULL) {
+            os_mutex_unlock(sGnSdk.lock);
+            return false;
+        }
+        node->nluResultListener = listener;
+        list_add_tail(&sGnSdk.nluResultListenerList, &node->listnode);
+    }
+    os_mutex_unlock(sGnSdk.lock);
+    return true;
+}
+
+void GenieSdk_Unregister_NluResultListener(GenieNluResultListener listener)
+{
+    if (!sGnInited || listener == NULL) {
+        OS_LOGE(TAG, "Genie Sdk is NOT inited");
+        return;
+    }
+
+    os_mutex_lock(sGnSdk.lock);
+    GnSdk_NluResultListenerNode_t *node;
+    struct listnode *item, *tmp;
+    list_for_each_safe(item, tmp, &sGnSdk.nluResultListenerList) {
+        node = listnode_to_item(item, GnSdk_NluResultListenerNode_t, listnode);
+        if (node->nluResultListener == listener) {
             list_remove(item);
             OS_FREE(node);
             break;
