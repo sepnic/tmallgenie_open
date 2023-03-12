@@ -32,6 +32,7 @@ static bool sGnSpeakerMuted  = false;
 // vendor init
 bool GnVendor_init(const char *userinfoFile, const char *wifiMac)
 {
+    // todo: get biz and account info from java layer, don't fix biz info in jni
     if (userinfoFile != nullptr) {
         snprintf(sGnAccountFile, sizeof(sGnAccountFile), "%s", userinfoFile);
         cJSON *rootJson = nullptr;

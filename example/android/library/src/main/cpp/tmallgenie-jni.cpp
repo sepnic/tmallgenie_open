@@ -74,6 +74,7 @@ static void TmallGenie_onCommand(Genie_Domain_t domain, Genie_Command_t command,
         attached = JNI_TRUE;
     }
 
+    // todo: move handle of account command to jave layer
     switch (command) {
         case GENIE_COMMAND_GuestDeviceActivateResp:
         case GENIE_COMMAND_MemberDeviceActivateResp: {

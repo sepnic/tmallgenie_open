@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     private final Context mThisContext = this;
     private AudioManager mAudioManager = null;
     private TmallGenie mTmallGenie = null;
+    private boolean mIsRecording = false;
     private TextView mCommandView;
     private TextView mStatusView;
     private TextView mAsrResultView;
@@ -151,7 +152,12 @@ public class MainActivity extends Activity {
     }
 
     public void onRecordClick(View view) {
-        mTmallGenie.native_onTextRecognize("我想听刘德华的歌曲");
+        if (!mIsRecording) {
+            mTmallGenie.native_onMicphoneWakeup("tianmaojingling", 0, 0.618);
+        } else {
+            mTmallGenie.native_onMicphoneSilence();
+        }
+        mIsRecording = !mIsRecording;
     }
 
     private final TmallGenie.OnCommandListener mCommandListener = new TmallGenie.OnCommandListener() {
