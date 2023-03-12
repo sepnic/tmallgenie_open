@@ -36,6 +36,7 @@ public:
     jmethodID   mOnStatus;
     jmethodID   mOnAsrResult;
     jmethodID   mOnNluResult;
+    jmethodID   mOnMemberQrCode;
     jclass      mClass;
     jobject     mObject;
 };
@@ -60,6 +61,19 @@ static void jniThrowException(JNIEnv *env, const char *className, const char *ms
 static void TmallGenie_onCommand(Genie_Domain_t domain, Genie_Command_t command, const char *payload)
 {
     OS_LOGD(TAG, "TmallGenie_onCommand: domain:%d, command:%d, payload:%s", domain, command, payload);
+    JNIEnv *env;
+    jint res = sJavaVM->GetEnv((void**) &env, JNI_VERSION_1_6);
+    jboolean attached = JNI_FALSE;
+    if (res != JNI_OK) {
+        JavaVMAttachArgs args = { JNI_VERSION_1_6, "TmallGenieCommandListener", nullptr };
+        res = sJavaVM->AttachCurrentThread(&env, &args);
+        if (res != JNI_OK) {
+            OS_LOGE(TAG, "Failed to AttachCurrentThread, errcode=%d", res);
+            return;
+        }
+        attached = JNI_TRUE;
+    }
+
     switch (command) {
         case GENIE_COMMAND_GuestDeviceActivateResp:
         case GENIE_COMMAND_MemberDeviceActivateResp: {
@@ -92,9 +106,12 @@ static void TmallGenie_onCommand(Genie_Domain_t domain, Genie_Command_t command,
                 char *qrCode = nullptr;
                 if (qrCodeJson != nullptr)
                     qrCode = cJSON_GetStringValue(qrCodeJson);
-                if (qrCode != nullptr)
+                if (qrCode != nullptr) {
                     OS_LOGW(TAG, "User type is guest, please scan the qrCode with tmallgenie app to"
                                  " bind the device as a member: qrCode=%s", qrCode);
+                    env->CallStaticVoidMethod(sTmallGenieJni.mClass, sTmallGenieJni.mOnMemberQrCode, sTmallGenieJni.mObject,
+                                              env->NewStringUTF(qrCode));
+                }
             }
             cJSON_Delete(payloadJson);
         }
@@ -103,18 +120,6 @@ static void TmallGenie_onCommand(Genie_Domain_t domain, Genie_Command_t command,
             break;
     }
 
-    JNIEnv *env;
-    jint res = sJavaVM->GetEnv((void**) &env, JNI_VERSION_1_6);
-    jboolean attached = JNI_FALSE;
-    if (res != JNI_OK) {
-        JavaVMAttachArgs args = { JNI_VERSION_1_6, "TmallGenieAsrResultListener", nullptr };
-        res = sJavaVM->AttachCurrentThread(&env, &args);
-        if (res != JNI_OK) {
-            OS_LOGE(TAG, "Failed to AttachCurrentThread, errcode=%d", res);
-            return;
-        }
-        attached = true;
-    }
     env->CallStaticVoidMethod(sTmallGenieJni.mClass, sTmallGenieJni.mOnCommand, sTmallGenieJni.mObject,
                               (jint)domain, (jint)command, env->NewStringUTF(payload));
     if (attached)
@@ -123,55 +128,17 @@ static void TmallGenie_onCommand(Genie_Domain_t domain, Genie_Command_t command,
 
 void TmallGenie_onStatus(Genie_Status_t status)
 {
-    switch (status) {
-        case GENIE_STATUS_NetworkDisconnected:
-            OS_LOGI(TAG, "-->NetworkDisconnected");
-            break;
-        case GENIE_STATUS_NetworkConnected:
-            OS_LOGI(TAG, "-->NetworkConnected");
-            break;
-        case GENIE_STATUS_GatewayDisconnected:
-            OS_LOGI(TAG, "-->GatewayDisconnected");
-            break;
-        case GENIE_STATUS_GatewayConnected:
-            OS_LOGI(TAG, "-->GatewayConnected");
-            break;
-        case GENIE_STATUS_Unauthorized:
-            OS_LOGI(TAG, "-->Unauthorized");
-            break;
-        case GENIE_STATUS_Authorized:
-            OS_LOGI(TAG, "-->Authorized");
-            break;
-        case GENIE_STATUS_SpeakerUnmuted:
-            OS_LOGI(TAG, "-->SpeakerUnmuted");
-            break;
-        case GENIE_STATUS_SpeakerMuted:
-            OS_LOGI(TAG, "-->SpeakerMuted");
-            break;
-        case GENIE_STATUS_MicphoneWakeup:
-            OS_LOGI(TAG, "-->MicphoneWakeup");
-            break;
-        case GENIE_STATUS_MicphoneStarted:
-            OS_LOGI(TAG, "-->MicphoneStarted");
-            break;
-        case GENIE_STATUS_MicphoneStopped:
-            OS_LOGI(TAG, "-->MicphoneStopped");
-            break;
-        default:
-            break;
-    }
-
     JNIEnv *env;
     jint res = sJavaVM->GetEnv((void**) &env, JNI_VERSION_1_6);
     jboolean attached = JNI_FALSE;
     if (res != JNI_OK) {
-        JavaVMAttachArgs args = { JNI_VERSION_1_6, "TmallGenieAsrResultListener", nullptr };
+        JavaVMAttachArgs args = { JNI_VERSION_1_6, "TmallGenieStatusListener", nullptr };
         res = sJavaVM->AttachCurrentThread(&env, &args);
         if (res != JNI_OK) {
             OS_LOGE(TAG, "Failed to AttachCurrentThread, errcode=%d", res);
             return;
         }
-        attached = true;
+        attached = JNI_TRUE;
     }
     env->CallStaticVoidMethod(sTmallGenieJni.mClass, sTmallGenieJni.mOnStatus, sTmallGenieJni.mObject,
                               (jint)status);
@@ -192,7 +159,7 @@ static void TmallGenie_onAsrResult(const char *result)
             OS_LOGE(TAG, "Failed to AttachCurrentThread, errcode=%d", res);
             return;
         }
-        attached = true;
+        attached = JNI_TRUE;
     }
     env->CallStaticVoidMethod(sTmallGenieJni.mClass, sTmallGenieJni.mOnAsrResult, sTmallGenieJni.mObject,
                               env->NewStringUTF(result));
@@ -213,7 +180,7 @@ static void TmallGenie_onNluResult(const char *result)
             OS_LOGE(TAG, "Failed to AttachCurrentThread, errcode=%d", res);
             return;
         }
-        attached = true;
+        attached = JNI_TRUE;
     }
     env->CallStaticVoidMethod(sTmallGenieJni.mClass, sTmallGenieJni.mOnNluResult, sTmallGenieJni.mObject,
                               env->NewStringUTF(result));
@@ -221,9 +188,12 @@ static void TmallGenie_onNluResult(const char *result)
         sJavaVM->DetachCurrentThread();
 }
 
-static jboolean TmallGenie_nativeCreate(JNIEnv* env, jobject thiz, jobject weak_this, jstring userinfoFile)
+static jboolean TmallGenie_nativeCreate(JNIEnv* env, jobject thiz, jobject weak_this, jstring userinfoFile, jstring wifiMac)
 {
     OS_LOGD(TAG, "TmallGenie_nativeCreate");
+
+    if (userinfoFile == nullptr || wifiMac == nullptr)
+        jniThrowException(env, "java/lang/IllegalArgumentException", "Received NULL jstring");
 
     if (sTmallGenieJni.mSdkInited) {
         OS_LOGE(TAG, "TmallGenie already inited");
@@ -257,6 +227,11 @@ static jboolean TmallGenie_nativeCreate(JNIEnv* env, jobject thiz, jobject weak_
         OS_LOGE(TAG, "Failed to get onNluResultFromNative mothod");
         return JNI_FALSE;
     }
+    sTmallGenieJni.mOnMemberQrCode = env->GetStaticMethodID(clazz, "onMemberQrCodeFromNative", "(Ljava/lang/Object;Ljava/lang/String;)V");
+    if (sTmallGenieJni.mOnMemberQrCode == nullptr) {
+        OS_LOGE(TAG, "Failed to get onMemberQrCodeFromNative mothod");
+        return JNI_FALSE;
+    }
 
     env->DeleteLocalRef(clazz);
 
@@ -269,13 +244,16 @@ static jboolean TmallGenie_nativeCreate(JNIEnv* env, jobject thiz, jobject weak_
     sTmallGenieJni.mClass = (jclass)env->NewGlobalRef(clazz);
     sTmallGenieJni.mObject  = env->NewGlobalRef(weak_this);
 
-    const char *userinfoTxt = env->GetStringUTFChars(userinfoFile, nullptr);
-    if (!GnVendor_init(userinfoTxt)) {
+    const char *userinfoChar = env->GetStringUTFChars(userinfoFile, nullptr);
+    const char *wifiMacChar = env->GetStringUTFChars(wifiMac, nullptr);
+    if (!GnVendor_init(userinfoChar, wifiMacChar)) {
         OS_LOGE(TAG, "Failed to GnVendor_init");
-        env->ReleaseStringUTFChars(userinfoFile,userinfoTxt);
+        env->ReleaseStringUTFChars(userinfoFile,userinfoChar);
+        env->ReleaseStringUTFChars(wifiMac,wifiMacChar);
         return JNI_FALSE;
     }
-    env->ReleaseStringUTFChars(userinfoFile,userinfoTxt);
+    env->ReleaseStringUTFChars(userinfoFile,userinfoChar);
+    env->ReleaseStringUTFChars(wifiMac,wifiMacChar);
 
     GnVendor_Wrapper_t adapter = {
             .bizType = GnVendor_bizType,
@@ -384,6 +362,8 @@ static void TmallGenie_onNetworkDisconnected(JNIEnv *env, jobject thiz)
 
 static void TmallGenie_onMicphoneWakeup(JNIEnv *env, jobject thiz, jstring wakeupWord, jint doa, jdouble confidence)
 {
+    if (wakeupWord == nullptr)
+        jniThrowException(env, "java/lang/IllegalArgumentException", "Received NULL jstring");
     if (sTmallGenieJni.mSdkInited)
         sTmallGenieJni.mSdkCallback->onMicphoneWakeup("tianmaojingling", 0, 0.618);
 }
@@ -413,6 +393,8 @@ static void TmallGenie_onQueryUserInfo(JNIEnv *env, jobject thiz)
 
 static void TmallGenie_onTextRecognize(JNIEnv *env, jobject thiz, jstring inputText)
 {
+    if (inputText == nullptr)
+        jniThrowException(env, "java/lang/IllegalArgumentException", "Received NULL jstring");
     if (sTmallGenieJni.mSdkInited) {
         const char *text = env->GetStringUTFChars(inputText, nullptr);
         sTmallGenieJni.mSdkCallback->onTextRecognize(text);
@@ -421,7 +403,7 @@ static void TmallGenie_onTextRecognize(JNIEnv *env, jobject thiz, jstring inputT
 }
 
 static JNINativeMethod gMethods[] = {
-        {"native_create", "(Ljava/lang/Object;Ljava/lang/String;)Z", (void *)TmallGenie_nativeCreate},
+        {"native_create", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)Z", (void *)TmallGenie_nativeCreate},
         {"native_start", "()Z", (void *)TmallGenie_nativeStart},
         {"native_stop", "()V", (void *)TmallGenie_nativeStop},
         {"native_destroy", "()V", (void *)TmallGenie_nativeDestroy},

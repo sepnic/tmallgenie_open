@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2022 Qinglong<sysu.zqlong@gmail.com>
+// Copyright (c) 2023- Qinglong<sysu.zqlong@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,21 +26,21 @@
 
 #define MIN_BUFFER_QUEUE_LEN 2
 
-class PcmBuffer {
+class GnVendor_PcmBuffer {
 public:
-    PcmBuffer(char *buf, int len) {
+    GnVendor_PcmBuffer(char *buf, int len) {
         data = new char[len];
         size = len;
         memcpy(data, buf, len);
     }
-    ~PcmBuffer() {
+    ~GnVendor_PcmBuffer() {
         delete [] data;
     }
     char *data;
     int size;
 };
 
-struct PcmOpenSLES {
+struct GnVendor_OpenSLES {
     SLObjectItf engineObj;
     SLEngineItf engineItf;
     SLObjectItf outmixObj;
@@ -49,16 +49,16 @@ struct PcmOpenSLES {
     SLAndroidSimpleBufferQueueItf playerBufferQueue;
 
     SLuint32 queueSize;
-    std::list<PcmBuffer *> *bufferList;
+    std::list<GnVendor_PcmBuffer *> *bufferList;
     os_mutex bufferLock;
     os_cond bufferCond;
     bool hasStarted;
 };
 
 // this callback handler is called every time a buffer finishes playing
-static void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
+static void GnVendor_bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
-    auto *priv = reinterpret_cast<struct PcmOpenSLES *>(context);
+    auto *priv = reinterpret_cast<struct GnVendor_OpenSLES *>(context);
     os_mutex_lock(priv->bufferLock);
     // free the buffer that finishes playing
     if (!priv->bufferList->empty()) {
@@ -90,7 +90,7 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
             return nullptr;
     }
 
-    auto *priv = reinterpret_cast<struct PcmOpenSLES *>(OS_CALLOC(1, sizeof(struct PcmOpenSLES)));
+    auto *priv = reinterpret_cast<struct GnVendor_OpenSLES *>(OS_CALLOC(1, sizeof(struct GnVendor_OpenSLES)));
     if (priv == nullptr)
         return nullptr;
 
@@ -101,7 +101,7 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
 
     SLresult result = SL_RESULT_SUCCESS;
     do {
-        priv->bufferList = new std::list<PcmBuffer *>();
+        priv->bufferList = new std::list<GnVendor_PcmBuffer *>();
         priv->bufferLock = os_mutex_create();
         if (priv->bufferLock == nullptr) break;
         priv->bufferCond = os_cond_create();
@@ -155,7 +155,7 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
         result = (*priv->playerObj)->GetInterface(priv->playerObj, SL_IID_BUFFERQUEUE, &priv->playerBufferQueue);
         if (SL_RESULT_SUCCESS != result) break;
         // register callback on the buffer queue
-        result = (*priv->playerBufferQueue)->RegisterCallback(priv->playerBufferQueue, bqPlayerCallback, priv);
+        result = (*priv->playerBufferQueue)->RegisterCallback(priv->playerBufferQueue, GnVendor_bqPlayerCallback, priv);
         if (SL_RESULT_SUCCESS != result) break;
     } while (false);
 
@@ -169,8 +169,8 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
 
 int GnVendor_pcmOutWrite(void *handle, void *buffer, unsigned int size)
 {
-    auto *priv = reinterpret_cast<struct PcmOpenSLES *>(handle);
-    auto *outbuf = new PcmBuffer((char *)buffer, (int)size);
+    auto *priv = reinterpret_cast<struct GnVendor_OpenSLES *>(handle);
+    auto *outbuf = new GnVendor_PcmBuffer((char *)buffer, (int)size);
 
     os_mutex_lock(priv->bufferLock);
 
@@ -204,7 +204,7 @@ int GnVendor_pcmOutWrite(void *handle, void *buffer, unsigned int size)
 void GnVendor_pcmOutClose(void *handle)
 {
     OS_LOGD(TAG, "GnVendor_pcmOutClose");
-    auto *priv = reinterpret_cast<struct PcmOpenSLES *>(handle);
+    auto *priv = reinterpret_cast<struct GnVendor_OpenSLES *>(handle);
     // waiting all buffers in the list finished playing
     if (priv->bufferLock != nullptr && priv->bufferCond != nullptr && priv->bufferList != nullptr) {
         os_mutex_lock(priv->bufferLock);

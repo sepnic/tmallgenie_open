@@ -93,23 +93,21 @@ public class TmallGenie {
     private static final int WHAT_GENIE_STATUS      = 0x01;
     private static final int WHAT_GENIE_ASRRESULT   = 0x02;
     private static final int WHAT_GENIE_NLURESULT   = 0x03;
+    private static final int WHAT_GENIE_QRCODE      = 0x04;
 
     private final static String TAG = "TmallGenieJava";
     private final EventHandler mEventHandler;
     private HandlerThread mHandlerThread;
-    private String mUserinfoFile;
     private boolean mIsInited = false;
 
-    public TmallGenie(String userinfoFile) {
+    public TmallGenie() {
         Looper looper;
         if ((looper = Looper.myLooper()) == null && (looper = Looper.getMainLooper()) == null) {
-            // Create our own looper here in case MP was created without one
             mHandlerThread = new HandlerThread("TmallGenieEventThread");
             mHandlerThread.start();
             looper = mHandlerThread.getLooper();
         }
         mEventHandler = new EventHandler(this, looper);
-        mUserinfoFile = userinfoFile;
     }
 
     private class EventHandler extends Handler {
@@ -137,6 +135,11 @@ public class TmallGenie {
                 case WHAT_GENIE_NLURESULT:
                     if (mOnNluResultListener != null)
                         mOnNluResultListener.onNluResult((String)msg.obj);
+                    return;
+
+                case WHAT_GENIE_QRCODE:
+                    if (mOnMemberQrCodeListener != null)
+                        mOnMemberQrCodeListener.onMemberQrCode((String)msg.obj);
                     return;
 
                 default:
@@ -193,13 +196,24 @@ public class TmallGenie {
         }
     }
 
+    private static void onMemberQrCodeFromNative(Object tmallgenie_ref, String qrcode) {
+        TmallGenie p = (TmallGenie)((WeakReference)tmallgenie_ref).get();
+        if (p == null) {
+            return;
+        }
+        if (p.mEventHandler != null) {
+            Message m = p.mEventHandler.obtainMessage(WHAT_GENIE_QRCODE, 0, 0, qrcode);
+            p.mEventHandler.sendMessage(m);
+        }
+    }
+
     public interface OnCommandListener {
         void onCommand(int domain, int command, String payload);
     }
     public void setCommandListener(OnCommandListener listener) {
         mOnCommandListener = listener;
     }
-    private OnCommandListener mOnCommandListener;
+    private OnCommandListener mOnCommandListener = null;
 
     public interface OnStatusListener {
         void onStatus(int status);
@@ -207,7 +221,7 @@ public class TmallGenie {
     public void setStatusListener(OnStatusListener listener) {
         mOnStatusListener = listener;
     }
-    private OnStatusListener mOnStatusListener;
+    private OnStatusListener mOnStatusListener = null;
 
     public interface OnAsrResultListener {
         void onAsrResult(String result);
@@ -215,7 +229,7 @@ public class TmallGenie {
     public void setAsrResultListener(OnAsrResultListener listener) {
         mOnAsrResultListener = listener;
     }
-    private OnAsrResultListener mOnAsrResultListener;
+    private OnAsrResultListener mOnAsrResultListener = null;
 
     public interface OnNluResultListener {
         void onNluResult(String result);
@@ -223,47 +237,68 @@ public class TmallGenie {
     public void setNluResultListener(OnNluResultListener listener) {
         mOnNluResultListener = listener;
     }
-    private OnNluResultListener mOnNluResultListener;
+    private OnNluResultListener mOnNluResultListener = null;
+
+    public interface OnMemberQrCodeListener {
+        void onMemberQrCode(String qrcode);
+    }
+    public void setMemberQrCodeListener(OnMemberQrCodeListener listener) {
+        mOnMemberQrCodeListener = listener;
+    }
+    private OnMemberQrCodeListener mOnMemberQrCodeListener = null;
+
+    public boolean init(String userinfoFile, String wifiMac) throws IllegalArgumentException {
+        if (!mIsInited) {
+            if (native_create(new WeakReference<TmallGenie>(this), userinfoFile, wifiMac))
+                mIsInited = true;
+        }
+        return mIsInited;
+    }
 
     public boolean start() {
-        if (!mIsInited) {
-            if (!native_create(new WeakReference<TmallGenie>(this), mUserinfoFile))
-                return false;
-            mIsInited = true;
-        }
-        return native_start();
+        if (mIsInited)
+            return native_start();
+        else
+            return false;
     }
 
     public void stop() {
-        native_stop();
+        if (mIsInited)
+            native_stop();
     }
 
     public void release() {
-        native_destroy();
+        if (mIsInited)
+            native_destroy();
         if (mHandlerThread != null) {
             mHandlerThread.quitSafely();
         }
+        mOnCommandListener = null;
+        mOnStatusListener = null;
         mOnAsrResultListener = null;
         mOnNluResultListener = null;
+        mOnMemberQrCodeListener = null;
+        mIsInited = false;
     }
 
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    private native boolean native_create(Object tmallgenie_this, String userinfoFile);
+    private native boolean native_create(Object tmallgenie_this, String userinfoFile, String wifiMac)
+            throws IllegalArgumentException;
     private native void native_destroy();
     private native boolean native_start();
     private native void native_stop();
 
     public native void native_onNetworkConnected();
     public native void native_onNetworkDisconnected();
-    public native void native_onMicphoneWakeup(String wakeupWord, int doa, double confidence);
+    public native void native_onMicphoneWakeup(String wakeupWord, int doa, double confidence) throws IllegalArgumentException;
     public native void native_onMicphoneSilence();
     public native void native_onSpeakerVolumeChanged(int volume);
     public native void native_onSpeakerMutedChanged(boolean muted);
     public native void native_onQueryUserInfo();
-    public native void native_onTextRecognize(String inputText);
+    public native void native_onTextRecognize(String inputText) throws IllegalArgumentException;
 
     // Used to load the 'native-lib' library on application startup.
     static {

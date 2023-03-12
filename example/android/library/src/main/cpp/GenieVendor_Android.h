@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2022 Qinglong<sysu.zqlong@gmail.com>
+// Copyright (c) 2023- Qinglong<sysu.zqlong@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 #include <stdbool.h>
 
 // vendor init
-bool GnVendor_init(const char *userinfoFile);
+bool GnVendor_init(const char *userinfoFile, const char *wifiMac);
 
 // system & account info
 const char *GnVendor_bizType();

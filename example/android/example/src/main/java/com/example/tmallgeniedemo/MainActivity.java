@@ -19,7 +19,9 @@ package com.example.tmallgeniedemo;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
 import android.content.pm.PackageManager;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
@@ -34,6 +36,8 @@ import java.io.IOException;
 
 public class MainActivity extends Activity {
     private static final String TAG = "TmallGenieDemo";
+    private final Context mThisContext = this;
+    private AudioManager mAudioManager = null;
     private TmallGenie mTmallGenie = null;
     private TextView mCommandView;
     private TextView mStatusView;
@@ -55,7 +59,7 @@ public class MainActivity extends Activity {
         switch (permsRequestCode) {
             case PERMISSIONS_REQUEST_CODE_AUDIO:
                 if (grantResults[0] != PackageManager.PERMISSION_GRANTED){
-                    Toast.makeText(this, "Failed request RECORD_AUDIO permission", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Failed to request RECORD_AUDIO permission", Toast.LENGTH_LONG).show();
                 }
                 break;
             default:
@@ -79,6 +83,32 @@ public class MainActivity extends Activity {
         }
     }
 
+    private final AudioManager.OnAudioFocusChangeListener mAudioFocusChange = new
+            AudioManager.OnAudioFocusChangeListener() {
+                @Override
+                public void onAudioFocusChange(int focusChange) {
+                    switch (focusChange) {
+                        case AudioManager.AUDIOFOCUS_GAIN:
+                            if (mTmallGenie != null) {
+                                mTmallGenie.native_onSpeakerMutedChanged(false);
+                            }
+                            break;
+                        case AudioManager.AUDIOFOCUS_LOSS:
+                            if (mTmallGenie != null) {
+                                mTmallGenie.stop();
+                            }
+                            mAudioManager.abandonAudioFocus(mAudioFocusChange);
+                            break;
+                        case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                        case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                            if (mTmallGenie != null) {
+                                mTmallGenie.native_onSpeakerMutedChanged(true);
+                            }
+                            break;
+                    }
+                }
+            };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -88,26 +118,35 @@ public class MainActivity extends Activity {
 
         createUserinfoFile();
 
+        mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (mAudioManager != null)
+            mAudioManager.requestAudioFocus(mAudioFocusChange, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+
         mCommandView = findViewById(R.id.commandView);
         mAsrResultView = findViewById(R.id.asrResultView);
         mNluResultView = findViewById(R.id.nluResultView);
         mStatusView = findViewById(R.id.statusView);
 
-        mTmallGenie = new TmallGenie(mUserinfoFile);
+        mTmallGenie = new TmallGenie();
         mTmallGenie.setCommandListener(mCommandListener);
         mTmallGenie.setStatusListener(mStatusListener);
         mTmallGenie.setAsrResultListener(mAsrResultListener);
         mTmallGenie.setNluResultListener(mNluResultListener);
-        mTmallGenie.start();
-
-        // todo: monitor network status
-        mTmallGenie.native_onNetworkConnected();
+        mTmallGenie.setMemberQrCodeListener(mMemberQrCodeListener);
+        if (mTmallGenie.init(mUserinfoFile, WifiUtils.getMacAddress(this)) && mTmallGenie.start()) {
+            // todo: monitor network status
+            mTmallGenie.native_onNetworkConnected();
+        } else {
+            Toast.makeText(this, "Failed to start tmallgenie service", Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
     protected void onDestroy() {
         mTmallGenie.stop();
         mTmallGenie.release();
+        if (mAudioManager != null)
+            mAudioManager.abandonAudioFocus(mAudioFocusChange);
         super.onDestroy();
     }
 
@@ -175,6 +214,12 @@ public class MainActivity extends Activity {
     private final TmallGenie.OnNluResultListener mNluResultListener = new TmallGenie.OnNluResultListener() {
         public void onNluResult(String result) {
             mNluResultView.setText(result);
+        }
+    };
+
+    private final TmallGenie.OnMemberQrCodeListener mMemberQrCodeListener = new TmallGenie.OnMemberQrCodeListener() {
+        public void onMemberQrCode(String qrcode) {
+            Toast.makeText(mThisContext, "Please scan the qrcode to bind the device as member, qrcode="+qrcode, Toast.LENGTH_LONG).show();
         }
     };
 }

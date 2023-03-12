@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2022 Qinglong<sysu.zqlong@gmail.com>
+// Copyright (c) 2023- Qinglong<sysu.zqlong@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,11 +25,12 @@ static char sGnAccountFile[256];
 static bool sGnAccountAuthorized = false;
 static char sGnAccountUuid[512];
 static char sGnAccountAccessToken[512];
+static char sGnWifiMac[32];
 static int  sGnSpeakerVolume = 50;
 static bool sGnSpeakerMuted  = false;
 
 // vendor init
-bool GnVendor_init(const char *userinfoFile)
+bool GnVendor_init(const char *userinfoFile, const char *wifiMac)
 {
     if (userinfoFile != nullptr) {
         snprintf(sGnAccountFile, sizeof(sGnAccountFile), "%s", userinfoFile);
@@ -63,6 +64,13 @@ bool GnVendor_init(const char *userinfoFile)
     } else {
         snprintf(sGnAccountFile, sizeof(sGnAccountFile), "%s", "/storage/emulated/0/TmallGenieUserinfo.txt");
     }
+    if (wifiMac != nullptr) {
+        snprintf(sGnWifiMac, sizeof(sGnWifiMac), "%s", wifiMac);
+        OS_LOGI(TAG, "Successfully read wifi mac address: mac=%s", wifiMac);
+    } else {
+        OS_LOGE(TAG, "Invalid wifi mac address, abort...");
+        return false;
+    }
     return true;
 }
 
@@ -93,8 +101,7 @@ const char *GnVendor_caCert()
 
 const char *GnVendor_macAddr()
 {
-    // TODO: get real mac address
-    return "11:22:33:44:55:66";
+    return sGnWifiMac;
 }
 
 const char *GnVendor_uuid()
