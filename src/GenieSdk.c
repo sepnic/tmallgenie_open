@@ -212,7 +212,8 @@ static void GenieSdk_StatusListener(Genie_Status_t status)
     case GENIE_STATUS_NetworkDisconnected:
         if (!sGnSdk.isNetworkDisconnected) {
             GnPlayer_Clear_Playonce();
-            GnPlayer_New_Prompt(GENIE_PREBUILT_NETWORK_DISCONNECTED);
+            if (GnPlayer_IsMusicPlaying() || GnPlayer_IsPromptPlaying() || GnPlayer_IsTtsPlaying())
+                GnPlayer_New_Prompt(GENIE_PREBUILT_NETWORK_DISCONNECTED);
             sGnSdk.isNetworkDisconnected = true;
         }
         break;
@@ -222,7 +223,8 @@ static void GenieSdk_StatusListener(Genie_Status_t status)
     case GENIE_STATUS_GatewayDisconnected:
         if (!sGnSdk.isGatewayDisconnected && !sGnSdk.isNetworkDisconnected && !sGnSdk.isAccountUnauthorized) {
             GnPlayer_Clear_Playonce();
-            GnPlayer_New_Prompt(GENIE_PREBUILT_SERVER_DISCONNECTED);
+            if (GnPlayer_IsMusicPlaying() || GnPlayer_IsPromptPlaying() || GnPlayer_IsTtsPlaying())
+                GnPlayer_New_Prompt(GENIE_PREBUILT_SERVER_DISCONNECTED);
             sGnSdk.isGatewayDisconnected = true;
         }
         break;
@@ -232,7 +234,8 @@ static void GenieSdk_StatusListener(Genie_Status_t status)
     case GENIE_STATUS_Unauthorized:
         if (!sGnSdk.isAccountUnauthorized) {
             GnPlayer_Clear_Playonce();
-            GnPlayer_New_Prompt(GENIE_PREBUILT_ACCOUNT_UNAUTHORIZED);
+            if (GnPlayer_IsMusicPlaying() || GnPlayer_IsPromptPlaying() || GnPlayer_IsTtsPlaying())
+                GnPlayer_New_Prompt(GENIE_PREBUILT_ACCOUNT_UNAUTHORIZED);
             sGnSdk.isAccountUnauthorized = true;
         }
         break;

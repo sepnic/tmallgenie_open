@@ -93,6 +93,8 @@ bool GnUtpManager_Start();
 
 bool GnUtpManager_IsActive();
 
+bool GnUtpManager_IsPlaying(GnPlayer_Stream_t stream);
+
 void GnUtpManager_Stop();
 
 #ifdef __cplusplus

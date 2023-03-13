@@ -47,6 +47,12 @@ bool GnPlayer_Clear_Playonce();
 
 bool GnPlayer_IsActive();
 
+bool GnPlayer_IsMusicPlaying();
+
+bool GnPlayer_IsPromptPlaying();
+
+bool GnPlayer_IsTtsPlaying();
+
 void GnPlayer_Stop();
 
 #ifdef __cplusplus

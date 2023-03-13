@@ -1192,6 +1192,21 @@ bool GnUtpManager_IsActive()
     return sGnUtpManager.isLooperStarted;
 }
 
+bool GnUtpManager_IsPlaying(GnPlayer_Stream_t stream)
+{
+    switch (stream) {
+    case GENIE_PLAYER_STREAM_TTS:
+        return sGnUtpManager.ttsPlayer.isStarted;
+    case GENIE_PLAYER_STREAM_MUSIC:
+        return sGnUtpManager.musicPlayer.isStarted;
+    case GENIE_PLAYER_STREAM_PROMPT:
+    case GENIE_PLAYER_STREAM_PROMPT_WAKEUP:
+        return sGnUtpManager.promptPlayer.isStarted;
+    default:
+        return false;
+    }
+}
+
 void GnUtpManager_Stop()
 {
     if (!sGnInited) { OS_LOGE(TAG, "Genie UtpManager is NOT inited"); return; }

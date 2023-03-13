@@ -258,6 +258,21 @@ bool GnPlayer_IsActive()
     return sGnInited && GnUtpManager_IsActive();
 }
 
+bool GnPlayer_IsMusicPlaying()
+{
+    return GnUtpManager_IsPlaying(GENIE_PLAYER_STREAM_MUSIC);
+}
+
+bool GnPlayer_IsPromptPlaying()
+{
+    return GnUtpManager_IsPlaying(GENIE_PLAYER_STREAM_PROMPT);
+}
+
+bool GnPlayer_IsTtsPlaying()
+{
+    return GnUtpManager_IsPlaying(GENIE_PLAYER_STREAM_TTS);
+}
+
 void GnPlayer_Stop()
 {
     os_mutex_lock(sGnPlayer.lock);
