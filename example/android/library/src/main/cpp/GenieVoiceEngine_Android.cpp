@@ -14,7 +14,6 @@
 
 #include <cstdio>
 #include <cstring>
-#include <list>
 #include <mutex>
 #include <condition_variable>
 
@@ -27,12 +26,23 @@
 
 #define TAG "GenieVendorAndroid"
 
+#define ENABLE_LITEVAD_SPEECH_END_DETECT
+
 #define OS_LOGF(tag, format, ...) __android_log_print(ANDROID_LOG_FATAL,   tag, format, ##__VA_ARGS__)
 #define OS_LOGE(tag, format, ...) __android_log_print(ANDROID_LOG_ERROR,   tag, format, ##__VA_ARGS__)
 #define OS_LOGW(tag, format, ...) __android_log_print(ANDROID_LOG_WARN,    tag, format, ##__VA_ARGS__)
 #define OS_LOGI(tag, format, ...) __android_log_print(ANDROID_LOG_INFO,    tag, format, ##__VA_ARGS__)
 #define OS_LOGD(tag, format, ...) __android_log_print(ANDROID_LOG_DEBUG,   tag, format, ##__VA_ARGS__)
 #define OS_LOGV(tag, format, ...) __android_log_print(ANDROID_LOG_VERBOSE, tag, format, ##__VA_ARGS__)
+
+#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
+#include "litevad.h"
+#include "GenieSdk.h"
+// DO NOT MODIFY RECORD SETTINGS
+#define GENIE_RECORD_SAMPLE_RATE        16000
+#define GENIE_RECORD_SAMPLE_BIT         16
+#define GENIE_RECORD_CHANNEL_COUNT      1
+#endif
 
 static const SLuint32 kPlayerBufferQueueSize    = 2;
 static const SLuint32 kRecorderBufferQueueSize  = 2;
@@ -95,6 +105,10 @@ public:
         recorderItf(nullptr),
         recorderBufferQueue(nullptr),
         queueSize(kRecorderBufferQueueSize),
+#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
+        vadHandle(nullptr),
+        vadActive(false),
+#endif
         enqueueBuffer(nullptr),
         ringbuf(nullptr),
         isStarted(false),
@@ -102,6 +116,10 @@ public:
     {}
 
     ~GnVendor_PcmIn() {
+#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
+        if (vadHandle != nullptr)
+            litevad_destroy(vadHandle);
+#endif
         if (ringbuf != nullptr)
             lockfree_ringbuf_destroy(ringbuf);
         if (enqueueBuffer != nullptr)
@@ -114,6 +132,11 @@ public:
     SLRecordItf recorderItf;
     SLAndroidSimpleBufferQueueItf recorderBufferQueue;
     SLuint32 queueSize;
+
+#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
+    litevad_handle_t vadHandle;
+    bool vadActive;
+#endif
 
     char *enqueueBuffer;
     int enqueueSize;
@@ -153,6 +176,19 @@ static void GnVendor_recorderBufferQueueCallback(SLAndroidSimpleBufferQueueItf b
     auto *in = reinterpret_cast<GnVendor_PcmIn *>(context);
     std::unique_lock<std::mutex> lk(in->bufferLock);
     if (!in->needStop) {
+#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
+        static GenieSdk_Callback_t *sSdkCallback = nullptr;
+        litevad_result_t vadState = litevad_process(in->vadHandle, in->enqueueBuffer, in->enqueueSize);
+        if (in->vadActive && vadState == LITEVAD_RESULT_SPEECH_END) {
+            OS_LOGI(TAG, "VAD state changed (speech >> silence), onMicphoneSilence");
+            if (sSdkCallback == nullptr)
+                GenieSdk_Get_Callback(&sSdkCallback);
+            if (sSdkCallback != nullptr)
+                sSdkCallback->onMicphoneSilence();
+        }
+        if (!in->vadActive && vadState == LITEVAD_RESULT_SPEECH_BEGIN)
+            in->vadActive = true;
+#endif
         if (lockfree_ringbuf_bytes_available(in->ringbuf) < in->enqueueSize)
             OS_LOGE(TAG, "Insufficient free buffer (free:%d < read:%d), maybe reading thread is blocked",
                     lockfree_ringbuf_bytes_available(in->ringbuf), in->enqueueSize);
@@ -239,7 +275,7 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
         SLDataFormat_PCM format_pcm = {
                 SL_DATAFORMAT_PCM,
                 static_cast<SLuint32>(channelCount),             // channel count
-                static_cast<SLuint32>(sampleRate*1000),          // sample rate in mili second
+                static_cast<SLuint32>(sampleRate*1000),          // sample rate in milli second
                 pcmformat,                                       // bitsPerSample
                 pcmformat,                                       // containerSize
                 channelCount == 1 ? SL_SPEAKER_FRONT_LEFT : (SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT),
@@ -338,6 +374,7 @@ void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
 {
     OS_LOGD(TAG, "GnVendor_pcmInOpen: sampleRate=%d, channelCount=%d, bitsPerSample=%d",
             sampleRate, channelCount, bitsPerSample);
+
     SLuint32 pcmformat;
     switch (bitsPerSample) {
         case 16:
@@ -365,6 +402,22 @@ void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
     in->enqueueSize = enqueueSize;
     in->enqueueBuffer = new char[in->enqueueSize];
 
+#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
+    if (sampleRate != GENIE_RECORD_SAMPLE_RATE ||
+        channelCount != GENIE_RECORD_CHANNEL_COUNT ||
+        bitsPerSample != GENIE_RECORD_SAMPLE_BIT) {
+        OS_LOGE(TAG, "Invalid record parameters for litevad");
+        delete in;
+        return nullptr;
+    }
+    in->vadHandle = litevad_create(sampleRate, channelCount);
+    if (in->vadHandle == nullptr) {
+        OS_LOGE(TAG, "Failed to litevad_create");
+        delete in;
+        return nullptr;
+    }
+#endif
+
     SLresult result = SL_RESULT_SUCCESS;
     do {
         // create engine
@@ -386,7 +439,7 @@ void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
         SLDataFormat_PCM format_pcm = {
                 SL_DATAFORMAT_PCM,
                 static_cast<SLuint32>(channelCount),             // channel count
-                static_cast<SLuint32>(sampleRate*1000),          // sample rate in mili second
+                static_cast<SLuint32>(sampleRate*1000),          // sample rate in milli second
                 pcmformat,                                       // bitsPerSample
                 pcmformat,                                       // containerSize
                 channelCount == 1 ? SL_SPEAKER_FRONT_LEFT : (SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT),
