@@ -255,14 +255,14 @@ public class TmallGenie {
         return mIsInited;
     }
 
-    public boolean start() {
+    public boolean startService() {
         if (mIsInited)
             return native_start();
         else
             return false;
     }
 
-    public void stop() {
+    public void stopService() {
         if (mIsInited)
             native_stop();
     }
@@ -281,6 +281,16 @@ public class TmallGenie {
         mIsInited = false;
     }
 
+    public void startRecord() {
+        if (mIsInited)
+            native_onMicphoneWakeup("tianmaojingling", 0, 0.618);
+    }
+
+    public void stopRecord() {
+        if (mIsInited)
+            native_onMicphoneSilence();
+    }
+
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
@@ -290,11 +300,11 @@ public class TmallGenie {
     private native void native_destroy();
     private native boolean native_start();
     private native void native_stop();
+    private native void native_onMicphoneWakeup(String wakeupWord, int doa, double confidence) throws IllegalArgumentException;
+    private native void native_onMicphoneSilence();
 
     public native void native_onNetworkConnected();
     public native void native_onNetworkDisconnected();
-    public native void native_onMicphoneWakeup(String wakeupWord, int doa, double confidence) throws IllegalArgumentException;
-    public native void native_onMicphoneSilence();
     public native void native_onSpeakerVolumeChanged(int volume);
     public native void native_onSpeakerMutedChanged(boolean muted);
     public native void native_onQueryUserInfo();

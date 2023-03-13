@@ -96,7 +96,7 @@ public class MainActivity extends Activity {
                             break;
                         case AudioManager.AUDIOFOCUS_LOSS:
                             if (mTmallGenie != null) {
-                                mTmallGenie.stop();
+                                mTmallGenie.stopService();
                             }
                             mAudioManager.abandonAudioFocus(mAudioFocusChange);
                             break;
@@ -134,7 +134,7 @@ public class MainActivity extends Activity {
         mTmallGenie.setAsrResultListener(mAsrResultListener);
         mTmallGenie.setNluResultListener(mNluResultListener);
         mTmallGenie.setMemberQrCodeListener(mMemberQrCodeListener);
-        if (mTmallGenie.init(mUserinfoFile, WifiUtils.getMacAddress(this)) && mTmallGenie.start()) {
+        if (mTmallGenie.init(mUserinfoFile, WifiUtils.getMacAddress(this)) && mTmallGenie.startService()) {
             // todo: monitor network status
             mTmallGenie.native_onNetworkConnected();
         } else {
@@ -144,7 +144,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        mTmallGenie.stop();
+        mTmallGenie.stopService();
         mTmallGenie.release();
         if (mAudioManager != null)
             mAudioManager.abandonAudioFocus(mAudioFocusChange);
@@ -153,11 +153,10 @@ public class MainActivity extends Activity {
 
     public void onRecordClick(View view) {
         if (!mIsRecording) {
-            mTmallGenie.native_onMicphoneWakeup("tianmaojingling", 0, 0.618);
+            mTmallGenie.startRecord();
         } else {
-            mTmallGenie.native_onMicphoneSilence();
+            mTmallGenie.stopRecord();
         }
-        mIsRecording = !mIsRecording;
     }
 
     private final TmallGenie.OnCommandListener mCommandListener = new TmallGenie.OnCommandListener() {
@@ -200,9 +199,11 @@ public class MainActivity extends Activity {
                     break;
                 case TmallGenie.GENIE_STATUS_MicphoneStarted:
                     mStatusView.setText("MicphoneStarted");
+                    mIsRecording = true;
                     break;
                 case TmallGenie.GENIE_STATUS_MicphoneStopped:
                     mStatusView.setText("MicphoneStopped");
+                    mIsRecording = false;
                     break;
                 default:
                     mStatusView.setText("UnknownError");

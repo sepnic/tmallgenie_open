@@ -94,7 +94,12 @@ add_library(tmallgenie_core STATIC IMPORTED)
 set_target_properties(tmallgenie_core PROPERTIES IMPORTED_LOCATION "${TMALLGENIE_DIR}/lib/android/${ANDROID_ABI}/libtmallgenie_core.a")
 
 # tmallgenie-jni
-add_library(tmallgenie-jni SHARED tmallgenie-jni.cpp GenieVendor_Android.cpp GenieVoiceEngine_Android.cpp)
+set(JNI_SRC
+    tmallgenie-jni.cpp
+    GenieVendor_Android.cpp
+    GenieVoiceEngine_Android.cpp
+    lockfree_ringbuf.c)
+add_library(tmallgenie-jni SHARED ${JNI_SRC})
 target_link_libraries(tmallgenie-jni
     tmallgenie_open tmallgenie_core liteplayer_core litevad speex sysutils mbedtls
     OpenSLES android log)

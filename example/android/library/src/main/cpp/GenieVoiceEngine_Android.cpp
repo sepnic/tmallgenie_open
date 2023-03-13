@@ -15,34 +15,59 @@
 #include <cstdio>
 #include <cstring>
 #include <list>
+#include <mutex>
+#include <condition_variable>
+
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
-#include "osal/os_thread.h"
-#include "cutils/memory_helper.h"
-#include "cutils/log_helper.h"
+#include <android/log.h>
+
+#include "lockfree_ringbuf.h"
 #include "GenieVendor_Android.h"
 
 #define TAG "GenieVendorAndroid"
 
-// todo: optimize queue-size to reduce latency and fix xrun
-#define MIN_PLAYER_BUFFER_QUEUE_LEN     2
-#define MIN_RECORDER_BUFFER_QUEUE_LEN   4
+#define OS_LOGF(tag, format, ...) __android_log_print(ANDROID_LOG_FATAL,   tag, format, ##__VA_ARGS__)
+#define OS_LOGE(tag, format, ...) __android_log_print(ANDROID_LOG_ERROR,   tag, format, ##__VA_ARGS__)
+#define OS_LOGW(tag, format, ...) __android_log_print(ANDROID_LOG_WARN,    tag, format, ##__VA_ARGS__)
+#define OS_LOGI(tag, format, ...) __android_log_print(ANDROID_LOG_INFO,    tag, format, ##__VA_ARGS__)
+#define OS_LOGD(tag, format, ...) __android_log_print(ANDROID_LOG_DEBUG,   tag, format, ##__VA_ARGS__)
+#define OS_LOGV(tag, format, ...) __android_log_print(ANDROID_LOG_VERBOSE, tag, format, ##__VA_ARGS__)
 
-class GnVendor_PcmBuffer {
+static const SLuint32 kPlayerBufferQueueSize    = 2;
+static const SLuint32 kRecorderBufferQueueSize  = 2;
+
+static const int kPlayerFrameTime       = 30;// in ms
+static const int kPlayerFrameCount      = 2; // writeBufferTime = kPlayerFrameTime*kPlayerFrameCount
+static const int kPlayerBufferCount     = 4; // playerRingbufTime = writeBufferTime*kPlayerBufferCount
+
+static const int kRecorderFrameTime     = 30;// valid value for vad engine: { 10ms, 20ms, 30ms }
+static const int kRecorderFrameCount    = 2; // readBufferTime = kRecorderFrameTime*kRecorderFrameCount
+static const int kRecorderBufferCount   = 4; // recorderRingbufTime = readBufferTime*kRecorderBufferCount
+
+class GnVendor_PcmOut {
 public:
-    GnVendor_PcmBuffer(char *buf, int len) {
-        data = new char[len];
-        size = len;
-        memcpy(data, buf, len);
-    }
-    ~GnVendor_PcmBuffer() {
-        delete [] data;
-    }
-    char *data;
-    int size;
-};
+    GnVendor_PcmOut()
+      : engineObj(nullptr),
+        engineItf(nullptr),
+        outmixObj(nullptr),
+        playerObj(nullptr),
+        playerItf(nullptr),
+        playerBufferQueue(nullptr),
+        queueSize(kPlayerBufferQueueSize),
+        enqueueBuffer(nullptr),
+        ringbuf(nullptr),
+        isStarted(false),
+        needStop(false)
+    {}
 
-struct GnVendor_PcmOut {
+    ~GnVendor_PcmOut() {
+        if (ringbuf != nullptr)
+            lockfree_ringbuf_destroy(ringbuf);
+        if (enqueueBuffer != nullptr)
+            delete enqueueBuffer;
+    }
+
     SLObjectItf engineObj;
     SLEngineItf engineItf;
     SLObjectItf outmixObj;
@@ -51,75 +76,107 @@ struct GnVendor_PcmOut {
     SLAndroidSimpleBufferQueueItf playerBufferQueue;
     SLuint32 queueSize;
 
-    std::list<GnVendor_PcmBuffer *> *bufferList;
-    os_mutex bufferLock;
-    os_cond bufferCond;
+    char *enqueueBuffer;
+    int enqueueSize;
+    void *ringbuf;
+    std::mutex bufferLock;
+    std::condition_variable bufferCanRead;
+    std::condition_variable bufferCanWrite;
     bool isStarted;
+    bool needStop;
 };
 
 struct GnVendor_PcmIn {
+public:
+    GnVendor_PcmIn()
+      : engineObj(nullptr),
+        engineItf(nullptr),
+        recorderObj(nullptr),
+        recorderItf(nullptr),
+        recorderBufferQueue(nullptr),
+        queueSize(kRecorderBufferQueueSize),
+        enqueueBuffer(nullptr),
+        ringbuf(nullptr),
+        isStarted(false),
+        needStop(false)
+    {}
+
+    ~GnVendor_PcmIn() {
+        if (ringbuf != nullptr)
+            lockfree_ringbuf_destroy(ringbuf);
+        if (enqueueBuffer != nullptr)
+            delete enqueueBuffer;
+    }
+
     SLObjectItf engineObj;
     SLEngineItf engineItf;
     SLObjectItf recorderObj;
-    SLRecordItf   recorderItf;
+    SLRecordItf recorderItf;
     SLAndroidSimpleBufferQueueItf recorderBufferQueue;
     SLuint32 queueSize;
 
-    char *bufferPtr;
-    int bufferSize;
-    std::list<GnVendor_PcmBuffer *> *bufferList;
-    os_mutex bufferLock;
-    os_cond bufferCond;
+    char *enqueueBuffer;
+    int enqueueSize;
+    void *ringbuf;
+    std::mutex bufferLock;
+    std::condition_variable bufferCanRead;
     bool isStarted;
-    bool forceStop;
+    bool needStop;
 };
 
 // this callback handler is called every time a buffer finishes playing
-static void GnVendor_pcmOutBufferQueueCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
+static void GnVendor_playerBufferQueueCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
-    auto *priv = reinterpret_cast<struct GnVendor_PcmOut *>(context);
-    os_mutex_lock(priv->bufferLock);
-    // free the buffer that finishes playing
-    if (!priv->bufferList->empty()) {
-        delete priv->bufferList->front();
-        priv->bufferList->pop_front();
-        // notify writing-thread that the list has space to store new buffer
-        os_cond_signal(priv->bufferCond);
+    auto *out = reinterpret_cast<GnVendor_PcmOut *>(context);
+    std::unique_lock<std::mutex> lk(out->bufferLock);
+
+    if (out->needStop && lockfree_ringbuf_bytes_filled(out->ringbuf) < out->enqueueSize) {
+        lk.unlock();
+        out->bufferCanWrite.notify_one();
+        return;
     }
-    os_mutex_unlock(priv->bufferLock);
+
+    while (lockfree_ringbuf_bytes_filled(out->ringbuf) < out->enqueueSize)
+        out->bufferCanRead.wait(lk);
+    lockfree_ringbuf_read(out->ringbuf, out->enqueueBuffer, out->enqueueSize);
+    SLresult result = (*out->playerBufferQueue)->Enqueue(out->playerBufferQueue, out->enqueueBuffer, out->enqueueSize);
+    if (SL_RESULT_SUCCESS != result)
+        OS_LOGE(TAG, "Failed to enqueue buffer to playerBufferQueue");
+    // notify writing-thread that the list has space to store new buffer
+    lk.unlock();
+    out->bufferCanWrite.notify_one();
 }
 
 // this callback handler is called every time a buffer finishes recording
-static void GnVendor_pcmInBufferQueueCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
+static void GnVendor_recorderBufferQueueCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
-    auto *priv = reinterpret_cast<struct GnVendor_PcmIn *>(context);
-    auto *inbuf = new GnVendor_PcmBuffer(priv->bufferPtr, priv->bufferSize);
-    os_mutex_lock(priv->bufferLock);
-    if (!priv->forceStop) {
-        if (priv->bufferList->size() < priv->queueSize) {
+    auto *in = reinterpret_cast<GnVendor_PcmIn *>(context);
+    std::unique_lock<std::mutex> lk(in->bufferLock);
+    if (!in->needStop) {
+        if (lockfree_ringbuf_bytes_available(in->ringbuf) < in->enqueueSize)
+            OS_LOGE(TAG, "Insufficient free buffer (free:%d < read:%d), maybe reading thread is blocked",
+                    lockfree_ringbuf_bytes_available(in->ringbuf), in->enqueueSize);
+        {
             // enqueue the buffer that finishes recording
-            priv->bufferList->push_back(inbuf);
+            lockfree_ringbuf_unsafe_overwrite(in->ringbuf, in->enqueueBuffer, in->enqueueSize);
             // notify reading-thread that the list has available buffer
-            os_cond_signal(priv->bufferCond);
-        } else {
-            // todo: replace the old data with the new one
-            OS_LOGE(TAG, "No free buffer to save new recording data, maybe reading thread is blocked");
+            lk.unlock();
+            in->bufferCanRead.notify_one();
         }
-        SLresult result = (*priv->recorderBufferQueue)->Enqueue(priv->recorderBufferQueue, priv->bufferPtr, priv->bufferSize);
-        if (SL_RESULT_SUCCESS != result) {
+        SLresult result = (*in->recorderBufferQueue)->Enqueue(in->recorderBufferQueue, in->enqueueBuffer, in->enqueueSize);
+        if (SL_RESULT_SUCCESS != result)
             OS_LOGE(TAG, "Failed to enqueue buffer to recorderBufferQueue");
-        }
     } else {
-        SLresult result = (*priv->recorderItf)->SetRecordState(priv->recorderItf, SL_RECORDSTATE_STOPPED);
+        SLresult result = (*in->recorderItf)->SetRecordState(in->recorderItf, SL_RECORDSTATE_STOPPED);
         if (SL_RESULT_SUCCESS == result) {
             // notify stop-thread that the recorder has been stopped
-            priv->isStarted = false;
-            os_cond_signal(priv->bufferCond);
+            in->isStarted = false;
+            lk.unlock();
+            in->bufferCanRead.notify_one();
         } else {
             OS_LOGE(TAG, "Failed to stop recorder");
         }
     }
-    os_mutex_unlock(priv->bufferLock);
 }
 
 void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
@@ -142,46 +199,46 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
             return nullptr;
     }
 
-    auto *priv = reinterpret_cast<struct GnVendor_PcmOut *>(OS_CALLOC(1, sizeof(struct GnVendor_PcmOut)));
-    if (priv == nullptr)
+    int frameSize = sampleRate/1000*kPlayerFrameTime;
+    int enqueueSize = (frameSize*channelCount*bitsPerSample/8)*kPlayerFrameCount;
+    void *ringbuf = lockfree_ringbuf_create(enqueueSize*kPlayerBufferCount);
+    if (ringbuf == nullptr)
         return nullptr;
 
-    priv->queueSize = MIN_PLAYER_BUFFER_QUEUE_LEN * channelCount;
+    auto *out = new GnVendor_PcmOut();
+    out->queueSize *= channelCount;
     if (sampleRate > 16000)
-        priv->queueSize *= (sampleRate/16000);
+        out->queueSize *= (sampleRate/16000);
+    out->ringbuf = ringbuf;
+    out->enqueueSize = enqueueSize;
+    out->enqueueBuffer = new char[out->enqueueSize];
 
     SLresult result = SL_RESULT_SUCCESS;
     do {
-        priv->bufferList = new std::list<GnVendor_PcmBuffer *>();
-        priv->bufferLock = os_mutex_create();
-        if (priv->bufferLock == nullptr) break;
-        priv->bufferCond = os_cond_create();
-        if (priv->bufferCond == nullptr) break;
-
         // create engine
-        result = slCreateEngine(&priv->engineObj, 0, nullptr, 0, nullptr, nullptr);
+        result = slCreateEngine(&out->engineObj, 0, nullptr, 0, nullptr, nullptr);
         if (SL_RESULT_SUCCESS != result) break;
         // realize the engine
-        result = (*priv->engineObj)->Realize(priv->engineObj, SL_BOOLEAN_FALSE);
+        result = (*out->engineObj)->Realize(out->engineObj, SL_BOOLEAN_FALSE);
         if (SL_RESULT_SUCCESS != result) break;
         // get the engine interface, which is needed in order to create other objects
-        result = (*priv->engineObj)->GetInterface(priv->engineObj, SL_IID_ENGINE, &priv->engineItf);
+        result = (*out->engineObj)->GetInterface(out->engineObj, SL_IID_ENGINE, &out->engineItf);
         if (SL_RESULT_SUCCESS != result) break;
         // create output mix
-        result = (*priv->engineItf)->CreateOutputMix(priv->engineItf, &priv->outmixObj,  0, nullptr, nullptr);
+        result = (*out->engineItf)->CreateOutputMix(out->engineItf, &out->outmixObj,  0, nullptr, nullptr);
         if (SL_RESULT_SUCCESS != result) break;
         // realize the output mix
-        result = (*priv->outmixObj)->Realize(priv->outmixObj, SL_BOOLEAN_FALSE);
+        result = (*out->outmixObj)->Realize(out->outmixObj, SL_BOOLEAN_FALSE);
         if (SL_RESULT_SUCCESS != result) break;
 
         // configure audio sink
-        SLDataLocator_OutputMix outmix = {SL_DATALOCATOR_OUTPUTMIX, priv->outmixObj};
+        SLDataLocator_OutputMix outmix = {SL_DATALOCATOR_OUTPUTMIX, out->outmixObj};
         SLDataSink audioSnk = {&outmix, nullptr};
         // configure audio source
-        SLDataLocator_AndroidSimpleBufferQueue bufq = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, priv->queueSize};
+        SLDataLocator_AndroidSimpleBufferQueue bufq = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, out->queueSize};
         SLDataFormat_PCM format_pcm = {
                 SL_DATAFORMAT_PCM,
-                static_cast<SLuint32>(channelCount),                 // channel count
+                static_cast<SLuint32>(channelCount),             // channel count
                 static_cast<SLuint32>(sampleRate*1000),          // sample rate in mili second
                 pcmformat,                                       // bitsPerSample
                 pcmformat,                                       // containerSize
@@ -193,97 +250,88 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
         // create audio player
         const SLInterfaceID ids[] = {SL_IID_ANDROIDSIMPLEBUFFERQUEUE};
         const SLboolean req[] = {SL_BOOLEAN_TRUE};
-        result = (*priv->engineItf)->CreateAudioPlayer(priv->engineItf, &priv->playerObj, &audioSrc, &audioSnk,
-                                                       sizeof(ids)/sizeof(SLInterfaceID), ids, req);
+        result = (*out->engineItf)->CreateAudioPlayer(out->engineItf, &out->playerObj, &audioSrc, &audioSnk,
+                                                      sizeof(ids)/sizeof(SLInterfaceID), ids, req);
         if (SL_RESULT_SUCCESS != result) break;
         // realize the player
-        result = (*priv->playerObj)->Realize(priv->playerObj, SL_BOOLEAN_FALSE);
+        result = (*out->playerObj)->Realize(out->playerObj, SL_BOOLEAN_FALSE);
         if (SL_RESULT_SUCCESS != result) break;
         // get the play interface
-        result = (*priv->playerObj)->GetInterface(priv->playerObj, SL_IID_PLAY, &priv->playerItf);
+        result = (*out->playerObj)->GetInterface(out->playerObj, SL_IID_PLAY, &out->playerItf);
         if (SL_RESULT_SUCCESS != result) break;
         // get the buffer queue interface
-        result = (*priv->playerObj)->GetInterface(priv->playerObj, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &priv->playerBufferQueue);
+        result = (*out->playerObj)->GetInterface(out->playerObj, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &out->playerBufferQueue);
         if (SL_RESULT_SUCCESS != result) break;
         // register callback on the buffer queue
-        result = (*priv->playerBufferQueue)->RegisterCallback(priv->playerBufferQueue, GnVendor_pcmOutBufferQueueCallback, priv);
+        result = (*out->playerBufferQueue)->RegisterCallback(out->playerBufferQueue, GnVendor_playerBufferQueueCallback, out);
         if (SL_RESULT_SUCCESS != result) break;
     } while (false);
 
     if (SL_RESULT_SUCCESS == result) {
-        return priv;
+        return out;
     } else {
-        GnVendor_pcmOutClose(priv);
+        GnVendor_pcmOutClose(out);
         return nullptr;
     }
 }
 
 int GnVendor_pcmOutWrite(void *handle, void *buffer, unsigned int size)
 {
-    auto *priv = reinterpret_cast<struct GnVendor_PcmOut *>(handle);
-    auto *outbuf = new GnVendor_PcmBuffer((char *)buffer, (int)size);
+    auto *out = reinterpret_cast<GnVendor_PcmOut *>(handle);
 
-    os_mutex_lock(priv->bufferLock);
-
-    // waiting the list is available
-    while (priv->bufferList->size() >= priv->queueSize)
-        os_cond_wait(priv->bufferCond, priv->bufferLock);
-    priv->bufferList->push_back(outbuf);
-
-    SLresult result = (*priv->playerBufferQueue)->Enqueue(priv->playerBufferQueue, outbuf->data, outbuf->size);
-    if (SL_RESULT_SUCCESS != result) {
-        os_mutex_unlock(priv->bufferLock);
+    if (size > lockfree_ringbuf_get_size(out->ringbuf)) {
+        OS_LOGE(TAG, "Insufficient ringbuf size, write size too big");
         return -1;
     }
 
-    if (!priv->isStarted) {
-        if (priv->bufferList->size() >= priv->queueSize) {
-            priv->isStarted = true;
-            // set the player's state to playing
-            result = (*priv->playerItf)->SetPlayState(priv->playerItf, SL_PLAYSTATE_PLAYING);
-            if (SL_RESULT_SUCCESS != result) {
-                os_mutex_unlock(priv->bufferLock);
-                return -1;
-            }
-        }
+    std::unique_lock<std::mutex> lk(out->bufferLock);
+    // waiting the list is available
+    while (lockfree_ringbuf_bytes_available(out->ringbuf) < size)
+        out->bufferCanWrite.wait(lk);
+
+    lockfree_ringbuf_write(out->ringbuf, (char *)buffer, (int)size);
+    if (lockfree_ringbuf_bytes_filled(out->ringbuf) >= out->enqueueSize) {
+        lk.unlock();
+        out->bufferCanRead.notify_one();
     }
 
-    os_mutex_unlock(priv->bufferLock);
+    if (!out->isStarted) {
+        if (lockfree_ringbuf_bytes_filled(out->ringbuf) >= lockfree_ringbuf_get_size(out->ringbuf)/2) {
+            out->isStarted = true;
+            memset(out->enqueueBuffer, 0x0, out->enqueueSize);
+            SLresult result = (*out->playerBufferQueue)->Enqueue(out->playerBufferQueue, out->enqueueBuffer, out->enqueueSize);
+            if (SL_RESULT_SUCCESS != result)
+                return -1;
+            // set the player's state to playing
+            result = (*out->playerItf)->SetPlayState(out->playerItf, SL_PLAYSTATE_PLAYING);
+            if (SL_RESULT_SUCCESS != result)
+                return -1;
+        }
+    }
     return (int)size;
 }
 
 void GnVendor_pcmOutClose(void *handle)
 {
     OS_LOGD(TAG, "GnVendor_pcmOutClose");
-    auto *priv = reinterpret_cast<struct GnVendor_PcmOut *>(handle);
-    // waiting all buffers in the list finished playing
-    if (priv->bufferLock != nullptr && priv->bufferCond != nullptr && priv->bufferList != nullptr) {
-        os_mutex_lock(priv->bufferLock);
-        while (!priv->bufferList->empty())
-            os_cond_wait(priv->bufferCond, priv->bufferLock);
-        os_mutex_unlock(priv->bufferLock);
+    auto *out = reinterpret_cast<GnVendor_PcmOut *>(handle);
+
+    out->needStop = true;
+    {
+        // waiting all buffers in the list finished playing
+        std::unique_lock<std::mutex> lk(out->bufferLock);
+        while (lockfree_ringbuf_bytes_filled(out->ringbuf) >= out->enqueueSize)
+            out->bufferCanWrite.wait(lk);
     }
 
-    if (priv->bufferList != nullptr) {
-        for (auto & iter : *priv->bufferList) {
-            delete iter;
-        }
-        delete priv->bufferList;
-    }
+    if (out->playerObj != nullptr)
+        (*out->playerObj)->Destroy(out->playerObj);
+    if (out->outmixObj != nullptr)
+        (*out->outmixObj)->Destroy(out->outmixObj);
+    if (out->engineObj != nullptr)
+        (*out->engineObj)->Destroy(out->engineObj);
 
-    if (priv->bufferCond != nullptr)
-        os_cond_destroy(priv->bufferCond);
-    if (priv->bufferLock != nullptr)
-        os_mutex_destroy(priv->bufferLock);
-
-    if (priv->playerObj != nullptr)
-        (*priv->playerObj)->Destroy(priv->playerObj);
-    if (priv->outmixObj != nullptr)
-        (*priv->outmixObj)->Destroy(priv->outmixObj);
-    if (priv->engineObj != nullptr)
-        (*priv->engineObj)->Destroy(priv->engineObj);
-
-    OS_FREE(priv);
+    delete out;
 }
 
 void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
@@ -306,45 +354,38 @@ void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
             return nullptr;
     }
 
-    auto *priv = reinterpret_cast<struct GnVendor_PcmIn *>(OS_CALLOC(1, sizeof(struct GnVendor_PcmIn)));
-    if (priv == nullptr)
+    int frameSize = sampleRate/1000*kRecorderFrameTime;
+    int enqueueSize = (frameSize*channelCount*bitsPerSample/8)*kRecorderFrameCount;
+    void *ringbuf = lockfree_ringbuf_create(enqueueSize*kRecorderBufferCount);
+    if (ringbuf == nullptr)
         return nullptr;
 
-    priv->queueSize = MIN_RECORDER_BUFFER_QUEUE_LEN;
-
-    int frameMs = 30; // valid value for vad engine: { 10ms, 20ms, 30ms }
-    int frameSize = sampleRate/1000*frameMs;
-    int multiple = 2;
-    priv->bufferSize = (frameSize*channelCount*bitsPerSample/8)*multiple;
-    priv->bufferPtr = new char[priv->bufferSize];
+    auto *in = new GnVendor_PcmIn();
+    in->ringbuf = ringbuf;
+    in->enqueueSize = enqueueSize;
+    in->enqueueBuffer = new char[in->enqueueSize];
 
     SLresult result = SL_RESULT_SUCCESS;
     do {
-        priv->bufferList = new std::list<GnVendor_PcmBuffer *>();
-        priv->bufferLock = os_mutex_create();
-        if (priv->bufferLock == nullptr) break;
-        priv->bufferCond = os_cond_create();
-        if (priv->bufferCond == nullptr) break;
-
         // create engine
-        result = slCreateEngine(&priv->engineObj, 0, nullptr, 0, nullptr, nullptr);
+        result = slCreateEngine(&in->engineObj, 0, nullptr, 0, nullptr, nullptr);
         if (SL_RESULT_SUCCESS != result) break;
         // realize the engine
-        result = (*priv->engineObj)->Realize(priv->engineObj, SL_BOOLEAN_FALSE);
+        result = (*in->engineObj)->Realize(in->engineObj, SL_BOOLEAN_FALSE);
         if (SL_RESULT_SUCCESS != result) break;
         // get the engine interface, which is needed in order to create other objects
-        result = (*priv->engineObj)->GetInterface(priv->engineObj, SL_IID_ENGINE, &priv->engineItf);
+        result = (*in->engineObj)->GetInterface(in->engineObj, SL_IID_ENGINE, &in->engineItf);
         if (SL_RESULT_SUCCESS != result) break;
 
         // configure audio source
         SLDataLocator_IODevice iodevice = {SL_DATALOCATOR_IODEVICE, SL_IODEVICE_AUDIOINPUT,
-                                          SL_DEFAULTDEVICEID_AUDIOINPUT, nullptr};
+                                           SL_DEFAULTDEVICEID_AUDIOINPUT, nullptr};
         SLDataSource audioSrc = {&iodevice, nullptr};
         // configure audio sink
-        SLDataLocator_AndroidSimpleBufferQueue bufq = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, priv->queueSize};
+        SLDataLocator_AndroidSimpleBufferQueue bufq = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, in->queueSize};
         SLDataFormat_PCM format_pcm = {
                 SL_DATAFORMAT_PCM,
-                static_cast<SLuint32>(channelCount),                 // channel count
+                static_cast<SLuint32>(channelCount),             // channel count
                 static_cast<SLuint32>(sampleRate*1000),          // sample rate in mili second
                 pcmformat,                                       // bitsPerSample
                 pcmformat,                                       // containerSize
@@ -356,90 +397,67 @@ void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
         // create audio recorder
         const SLInterfaceID ids[] = {SL_IID_ANDROIDSIMPLEBUFFERQUEUE};
         const SLboolean req[] = {SL_BOOLEAN_TRUE};
-        result = (*priv->engineItf)->CreateAudioRecorder(priv->engineItf, &priv->recorderObj, &audioSrc, &audioSnk,
+        result = (*in->engineItf)->CreateAudioRecorder(in->engineItf, &in->recorderObj, &audioSrc, &audioSnk,
                                                        sizeof(ids)/sizeof(SLInterfaceID), ids, req);
 
         if (SL_RESULT_SUCCESS != result) break;
         // realize the recorder
-        result = (*priv->recorderObj)->Realize(priv->recorderObj, SL_BOOLEAN_FALSE);
+        result = (*in->recorderObj)->Realize(in->recorderObj, SL_BOOLEAN_FALSE);
         if (SL_RESULT_SUCCESS != result) break;
         // get the record interface
-        result = (*priv->recorderObj)->GetInterface(priv->recorderObj, SL_IID_RECORD, &priv->recorderItf);
+        result = (*in->recorderObj)->GetInterface(in->recorderObj, SL_IID_RECORD, &in->recorderItf);
         if (SL_RESULT_SUCCESS != result) break;
         // get the buffer queue interface
-        result = (*priv->recorderObj)->GetInterface(priv->recorderObj, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &priv->recorderBufferQueue);
+        result = (*in->recorderObj)->GetInterface(in->recorderObj, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &in->recorderBufferQueue);
         if (SL_RESULT_SUCCESS != result) break;
-        result = (*priv->recorderBufferQueue)->Enqueue(priv->recorderBufferQueue, priv->bufferPtr, priv->bufferSize);
+        result = (*in->recorderBufferQueue)->Enqueue(in->recorderBufferQueue, in->enqueueBuffer, in->enqueueSize);
         if (SL_RESULT_SUCCESS != result) break;
         // register callback on the buffer queue
-        result = (*priv->recorderBufferQueue)->RegisterCallback(priv->recorderBufferQueue, GnVendor_pcmInBufferQueueCallback, priv);
+        result = (*in->recorderBufferQueue)->RegisterCallback(in->recorderBufferQueue, GnVendor_recorderBufferQueueCallback, in);
         if (SL_RESULT_SUCCESS != result) break;
 
         // set the recorder's state to recording
-        result = (*priv->recorderItf)->SetRecordState(priv->recorderItf, SL_RECORDSTATE_RECORDING);
+        result = (*in->recorderItf)->SetRecordState(in->recorderItf, SL_RECORDSTATE_RECORDING);
         if (SL_RESULT_SUCCESS != result) break;
-        priv->isStarted = true;
+        in->isStarted = true;
     } while (false);
 
     if (SL_RESULT_SUCCESS == result) {
-        return priv;
+        return in;
     } else {
-        GnVendor_pcmInClose(priv);
+        GnVendor_pcmInClose(in);
         return nullptr;
     }
 }
 
 int GnVendor_pcmInRead(void *handle, void *buffer, unsigned int size)
 {
-    auto *priv = reinterpret_cast<struct GnVendor_PcmIn *>(handle);
+    auto *in = reinterpret_cast<GnVendor_PcmIn *>(handle);
 
-    os_mutex_lock(priv->bufferLock);
-
+    std::unique_lock<std::mutex> lk(in->bufferLock);
     // waiting the list is available
-    while (priv->bufferList->empty())
-        os_cond_wait(priv->bufferCond, priv->bufferLock);
+    while (lockfree_ringbuf_bytes_filled(in->ringbuf) <= 0)
+        in->bufferCanRead.wait(lk);
 
-    auto *inBuffer = priv->bufferList->front();
-    size = size <= inBuffer->size ? size : inBuffer->size;
-    memcpy(buffer, inBuffer->data, size);
-
-    delete inBuffer;
-    priv->bufferList->pop_front();
-
-    os_mutex_unlock(priv->bufferLock);
-    return (int)size;
+    return lockfree_ringbuf_read(in->ringbuf, (char *)buffer, (int)size);
 }
 
 void GnVendor_pcmInClose(void *handle)
 {
     OS_LOGD(TAG, "GnVendor_pcmInClose");
-    auto *priv = reinterpret_cast<struct GnVendor_PcmIn *>(handle);
-    priv->forceStop = true;
-    if (priv->bufferLock != nullptr && priv->bufferCond != nullptr) {
-        os_mutex_lock(priv->bufferLock);
-        while (priv->isStarted)
-            os_cond_wait(priv->bufferCond, priv->bufferLock);
-        os_mutex_unlock(priv->bufferLock);
+    auto *in = reinterpret_cast<GnVendor_PcmIn *>(handle);
+
+    in->needStop = true;
+    {
+        std::unique_lock<std::mutex> lk(in->bufferLock);
+        while (in->isStarted)
+            in->bufferCanRead.wait(lk);
     }
 
-    if (priv->bufferList != nullptr) {
-        for (auto & iter : *priv->bufferList) {
-            delete iter;
-        }
-        delete priv->bufferList;
-    }
-    if (priv->bufferPtr != nullptr)
-        delete [] priv->bufferPtr;
+    if (in->recorderObj != nullptr)
+        (*in->recorderObj)->Destroy(in->recorderObj);
+    if (in->engineObj != nullptr)
+        (*in->engineObj)->Destroy(in->engineObj);
 
-    if (priv->bufferCond != nullptr)
-        os_cond_destroy(priv->bufferCond);
-    if (priv->bufferLock != nullptr)
-        os_mutex_destroy(priv->bufferLock);
-
-    if (priv->recorderObj != nullptr)
-        (*priv->recorderObj)->Destroy(priv->recorderObj);
-    if (priv->engineObj != nullptr)
-        (*priv->engineObj)->Destroy(priv->engineObj);
-
-    OS_FREE(priv);
+    delete in;
 }
