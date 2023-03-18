@@ -17,8 +17,17 @@
 
 #include <stdbool.h>
 
+// jni callback
+int  TmallGenie_onGetVolume();
+bool TmallGenie_onSetVolume(int volume);
+
 // vendor init
-bool GnVendor_init(const char *userinfoFile, const char *wifiMac);
+bool GnVendor_init(const char *wifiMac,
+                   const char *bizType = nullptr, const char *bizGroup = nullptr,
+                   const char *bizSecret = nullptr, const char *caCert = nullptr,
+                   const char *uuid = nullptr, const char *accessToken = nullptr);
+bool GnVendor_enableKeywordDetect();
+void GnVendor_disableKeywordDetect();
 
 // system & account info
 const char *GnVendor_bizType();
@@ -28,7 +37,6 @@ const char *GnVendor_caCert();
 const char *GnVendor_macAddr();
 const char *GnVendor_uuid();       // if unauthorized, return null
 const char *GnVendor_accessToken();// if unauthorized, return null
-void GnVendor_updateAccount(const char *uuid, const char *accessToken);
 
 // audio pcm out
 void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample);

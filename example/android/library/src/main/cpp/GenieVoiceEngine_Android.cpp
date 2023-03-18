@@ -22,11 +22,14 @@
 #include <android/log.h>
 
 #include "lockfree_ringbuf.h"
+#include "GenieSdk.h"
 #include "GenieVendor_Android.h"
 
-#define TAG "GenieVendorAndroid"
+#if defined(GENIE_HAVE_LITEVAD_SPEECH_DETECT_ENABLED)
+#include "litevad.h"
+#endif
 
-#define ENABLE_LITEVAD_SPEECH_END_DETECT
+#define TAG "GenieVendorAndroid"
 
 #define OS_LOGF(tag, format, ...) __android_log_print(ANDROID_LOG_FATAL,   tag, format, ##__VA_ARGS__)
 #define OS_LOGE(tag, format, ...) __android_log_print(ANDROID_LOG_ERROR,   tag, format, ##__VA_ARGS__)
@@ -35,14 +38,13 @@
 #define OS_LOGD(tag, format, ...) __android_log_print(ANDROID_LOG_DEBUG,   tag, format, ##__VA_ARGS__)
 #define OS_LOGV(tag, format, ...) __android_log_print(ANDROID_LOG_VERBOSE, tag, format, ##__VA_ARGS__)
 
-#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
-#include "litevad.h"
-#include "GenieSdk.h"
-// DO NOT MODIFY RECORD SETTINGS
-#define GENIE_RECORD_SAMPLE_RATE        16000
-#define GENIE_RECORD_SAMPLE_BIT         16
-#define GENIE_RECORD_CHANNEL_COUNT      1
-#endif
+// See build options in CMakeLists.txt
+//#define GENIE_HAVE_LITEVAD_SPEECH_DETECT_ENABLED
+
+// DO NOT MODIFY RECORD SETTINGS FOR VOICE ENGINE
+#define VOICE_ENGINE_SAMPLE_RATE        16000
+#define VOICE_ENGINE_SAMPLE_BIT         16
+#define VOICE_ENGINE_CHANNEL_COUNT      1
 
 static const SLuint32 kPlayerBufferQueueSize    = 2;
 static const SLuint32 kRecorderBufferQueueSize  = 2;
@@ -96,7 +98,7 @@ public:
     bool needStop;
 };
 
-struct GnVendor_PcmIn {
+class GnVendor_PcmIn {
 public:
     GnVendor_PcmIn()
       : engineObj(nullptr),
@@ -105,18 +107,20 @@ public:
         recorderItf(nullptr),
         recorderBufferQueue(nullptr),
         queueSize(kRecorderBufferQueueSize),
-#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
+#if defined(GENIE_HAVE_LITEVAD_SPEECH_DETECT_ENABLED)
         vadHandle(nullptr),
         vadActive(false),
 #endif
         enqueueBuffer(nullptr),
         ringbuf(nullptr),
         isStarted(false),
+        isRecording(false),
+        enableKeywordDetect(false),
         needStop(false)
     {}
 
     ~GnVendor_PcmIn() {
-#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
+#if defined(GENIE_HAVE_LITEVAD_SPEECH_DETECT_ENABLED)
         if (vadHandle != nullptr)
             litevad_destroy(vadHandle);
 #endif
@@ -133,7 +137,11 @@ public:
     SLAndroidSimpleBufferQueueItf recorderBufferQueue;
     SLuint32 queueSize;
 
-#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
+    int sampleRate;
+    int channelCount;
+    int bitsPerSample;
+
+#if defined(GENIE_HAVE_LITEVAD_SPEECH_DETECT_ENABLED)
     litevad_handle_t vadHandle;
     bool vadActive;
 #endif
@@ -144,8 +152,13 @@ public:
     std::mutex bufferLock;
     std::condition_variable bufferCanRead;
     bool isStarted;
+    bool isRecording;
+    bool enableKeywordDetect;
     bool needStop;
 };
+
+static std::mutex      sVoiceEngineLock;
+static GnVendor_PcmIn *sVoiceEngineInst = nullptr;
 
 // this callback handler is called every time a buffer finishes playing
 static void GnVendor_playerBufferQueueCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
@@ -174,50 +187,58 @@ static void GnVendor_playerBufferQueueCallback(SLAndroidSimpleBufferQueueItf bq,
 static void GnVendor_recorderBufferQueueCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
     auto *in = reinterpret_cast<GnVendor_PcmIn *>(context);
-    std::unique_lock<std::mutex> lk(in->bufferLock);
     if (!in->needStop) {
-#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
         static GenieSdk_Callback_t *sSdkCallback = nullptr;
-        litevad_result_t vadState = litevad_process(in->vadHandle, in->enqueueBuffer, in->enqueueSize);
-        if (in->vadActive && vadState == LITEVAD_RESULT_SPEECH_END) {
-            OS_LOGI(TAG, "VAD state changed (speech >> silence), onMicphoneSilence");
-            if (sSdkCallback == nullptr)
-                GenieSdk_Get_Callback(&sSdkCallback);
-            if (sSdkCallback != nullptr)
-                sSdkCallback->onMicphoneSilence();
-        }
-        if (!in->vadActive && vadState == LITEVAD_RESULT_SPEECH_BEGIN)
-            in->vadActive = true;
+        if (in->isRecording) {
+#if defined(GENIE_HAVE_LITEVAD_SPEECH_DETECT_ENABLED)
+            litevad_result_t vadState = litevad_process(in->vadHandle, in->enqueueBuffer, in->enqueueSize);
+            if (in->vadActive && vadState == LITEVAD_RESULT_SPEECH_END) {
+                OS_LOGI(TAG, "VAD state changed (speech >> silence), onMicphoneSilence");
+                if (sSdkCallback == nullptr)
+                    GenieSdk_Get_Callback(&sSdkCallback);
+                if (sSdkCallback != nullptr)
+                    sSdkCallback->onMicphoneSilence();
+            }
+            if (!in->vadActive && vadState == LITEVAD_RESULT_SPEECH_BEGIN)
+                in->vadActive = true;
 #endif
-        if (lockfree_ringbuf_bytes_available(in->ringbuf) < in->enqueueSize)
-            OS_LOGE(TAG, "Insufficient free buffer (free:%d < read:%d), maybe reading thread is blocked",
-                    lockfree_ringbuf_bytes_available(in->ringbuf), in->enqueueSize);
-        {
+
+            std::unique_lock<std::mutex> lk(in->bufferLock);
+            if (lockfree_ringbuf_bytes_available(in->ringbuf) < in->enqueueSize)
+                OS_LOGE(TAG, "Insufficient free buffer (free:%d < read:%d), maybe read-thread is blocked",
+                        lockfree_ringbuf_bytes_available(in->ringbuf), in->enqueueSize);
             // enqueue the buffer that finishes recording
             lockfree_ringbuf_unsafe_overwrite(in->ringbuf, in->enqueueBuffer, in->enqueueSize);
             // notify reading-thread that the list has available buffer
             lk.unlock();
             in->bufferCanRead.notify_one();
+        } else if (in->enableKeywordDetect) {
+            // TODO: keyword detect
+            //if (sSdkCallback == nullptr)
+            //    GenieSdk_Get_Callback(&sSdkCallback);
+            //if (sSdkCallback != NULL)
+            //    sSdkCallback->onMicphoneWakeup("tian mao jing ling", 0, 0.600998834);
+        } else {
+            OS_LOGW(TAG, "Warning no handler for record data, it should not happen");
         }
         SLresult result = (*in->recorderBufferQueue)->Enqueue(in->recorderBufferQueue, in->enqueueBuffer, in->enqueueSize);
         if (SL_RESULT_SUCCESS != result)
             OS_LOGE(TAG, "Failed to enqueue buffer to recorderBufferQueue");
     } else {
         SLresult result = (*in->recorderItf)->SetRecordState(in->recorderItf, SL_RECORDSTATE_STOPPED);
-        if (SL_RESULT_SUCCESS == result) {
-            // notify stop-thread that the recorder has been stopped
-            in->isStarted = false;
-            lk.unlock();
-            in->bufferCanRead.notify_one();
-        } else {
+        if (SL_RESULT_SUCCESS != result)
             OS_LOGE(TAG, "Failed to stop recorder");
-        }
+        // notify stop-thread that the recorder has been stopped
+        std::unique_lock<std::mutex> lk(in->bufferLock);
+        in->isStarted = false;
+        lk.unlock();
+        in->bufferCanRead.notify_one();
     }
 }
 
 void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
 {
-    OS_LOGD(TAG, "GnVendor_pcmOutOpen: sampleRate=%d, channelCount=%d, bitsPerSample=%d",
+    OS_LOGI(TAG, "GnVendor_pcmOutOpen: sampleRate=%d, channelCount=%d, bitsPerSample=%d",
             sampleRate, channelCount, bitsPerSample);
     SLuint32 pcmformat;
     switch (bitsPerSample) {
@@ -231,7 +252,7 @@ void *GnVendor_pcmOutOpen(int sampleRate, int channelCount, int bitsPerSample)
             pcmformat = SL_PCMSAMPLEFORMAT_FIXED_32;
             break;
         default:
-            OS_LOGE(TAG, "Unsupported sample bits(%d) for OpenSLES", bitsPerSample);
+            OS_LOGE(TAG, "Unsupported sample bits(%d)", bitsPerSample);
             return nullptr;
     }
 
@@ -349,7 +370,7 @@ int GnVendor_pcmOutWrite(void *handle, void *buffer, unsigned int size)
 
 void GnVendor_pcmOutClose(void *handle)
 {
-    OS_LOGD(TAG, "GnVendor_pcmOutClose");
+    OS_LOGI(TAG, "GnVendor_pcmOutClose");
     auto *out = reinterpret_cast<GnVendor_PcmOut *>(handle);
 
     out->needStop = true;
@@ -370,11 +391,8 @@ void GnVendor_pcmOutClose(void *handle)
     delete out;
 }
 
-void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
+static void *GnVendor_pcmInOpenHw(int sampleRate, int channelCount, int bitsPerSample)
 {
-    OS_LOGD(TAG, "GnVendor_pcmInOpen: sampleRate=%d, channelCount=%d, bitsPerSample=%d",
-            sampleRate, channelCount, bitsPerSample);
-
     SLuint32 pcmformat;
     switch (bitsPerSample) {
         case 16:
@@ -387,7 +405,7 @@ void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
             pcmformat = SL_PCMSAMPLEFORMAT_FIXED_32;
             break;
         default:
-            OS_LOGE(TAG, "Unsupported sample bits(%d) for OpenSLES", bitsPerSample);
+            OS_LOGE(TAG, "Unsupported sample bits(%d)", bitsPerSample);
             return nullptr;
     }
 
@@ -401,11 +419,14 @@ void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
     in->ringbuf = ringbuf;
     in->enqueueSize = enqueueSize;
     in->enqueueBuffer = new char[in->enqueueSize];
+    in->sampleRate = sampleRate;
+    in->channelCount = channelCount;
+    in->bitsPerSample = bitsPerSample;
 
-#if defined(ENABLE_LITEVAD_SPEECH_END_DETECT)
-    if (sampleRate != GENIE_RECORD_SAMPLE_RATE ||
-        channelCount != GENIE_RECORD_CHANNEL_COUNT ||
-        bitsPerSample != GENIE_RECORD_SAMPLE_BIT) {
+#if defined(GENIE_HAVE_LITEVAD_SPEECH_DETECT_ENABLED)
+    if (sampleRate != VOICE_ENGINE_SAMPLE_RATE ||
+        channelCount != VOICE_ENGINE_CHANNEL_COUNT ||
+        bitsPerSample != VOICE_ENGINE_SAMPLE_BIT) {
         OS_LOGE(TAG, "Invalid record parameters for litevad");
         delete in;
         return nullptr;
@@ -495,11 +516,9 @@ int GnVendor_pcmInRead(void *handle, void *buffer, unsigned int size)
     return lockfree_ringbuf_read(in->ringbuf, (char *)buffer, (int)size);
 }
 
-void GnVendor_pcmInClose(void *handle)
+static void GnVendor_pcmInCloseHW(void *handle)
 {
-    OS_LOGD(TAG, "GnVendor_pcmInClose");
     auto *in = reinterpret_cast<GnVendor_PcmIn *>(handle);
-
     in->needStop = true;
     {
         std::unique_lock<std::mutex> lk(in->bufferLock);
@@ -513,4 +532,94 @@ void GnVendor_pcmInClose(void *handle)
         (*in->engineObj)->Destroy(in->engineObj);
 
     delete in;
+}
+
+void *GnVendor_pcmInOpen(int sampleRate, int channelCount, int bitsPerSample)
+{
+    OS_LOGI(TAG, "GnVendor_pcmInOpen: sampleRate=%d, channelCount=%d, bitsPerSample=%d",
+            sampleRate, channelCount, bitsPerSample);
+
+    std::lock_guard<std::mutex> lg(sVoiceEngineLock);
+
+    if (sVoiceEngineInst != nullptr) {
+        if (sampleRate != sVoiceEngineInst->sampleRate ||
+            channelCount != sVoiceEngineInst->channelCount ||
+            bitsPerSample != sVoiceEngineInst->bitsPerSample) {
+            OS_LOGE(TAG, "Keyword-detect enabled, can't get voice-engine instance with incompatible parameters");
+            return nullptr;
+        }
+#if defined(GENIE_HAVE_LITEVAD_SPEECH_DETECT_ENABLED)
+        litevad_reset(sVoiceEngineInst->vadHandle);
+        sVoiceEngineInst->vadActive = false;
+#endif
+        {
+            std::unique_lock<std::mutex> ul(sVoiceEngineInst->bufferLock);
+            lockfree_ringbuf_unsafe_reset(sVoiceEngineInst->ringbuf);
+        }
+
+        OS_LOGD(TAG, "Keyword-detect enabled, get voice-engine instance instead of opening new one");
+        sVoiceEngineInst->isRecording = true;
+        return sVoiceEngineInst;
+    }
+
+    sVoiceEngineInst = (GnVendor_PcmIn *)GnVendor_pcmInOpenHw(sampleRate, channelCount, bitsPerSample);
+    if (sVoiceEngineInst != nullptr)
+        sVoiceEngineInst->isRecording = true;
+    return sVoiceEngineInst;
+}
+
+void GnVendor_pcmInClose(void *handle)
+{
+    OS_LOGI(TAG, "GnVendor_pcmInClose");
+    auto *in = reinterpret_cast<GnVendor_PcmIn *>(handle);
+
+    std::lock_guard<std::mutex> lk(sVoiceEngineLock);
+
+    if (in != sVoiceEngineInst) {
+        GnVendor_pcmInCloseHW(in);
+        return;
+    }
+
+    if (sVoiceEngineInst->enableKeywordDetect) {
+        OS_LOGD(TAG, "Keyword-detect enabled, don't actually close voice-engine instance");
+        sVoiceEngineInst->isRecording = false;
+        return;
+    }
+
+    GnVendor_pcmInCloseHW(sVoiceEngineInst);
+    sVoiceEngineInst = nullptr;
+}
+
+bool GnVendor_enableKeywordDetect()
+{
+    OS_LOGI(TAG, "GnVendor_enableKeywordDetect");
+
+    std::lock_guard<std::mutex> lk(sVoiceEngineLock);
+
+    if (sVoiceEngineInst == nullptr)
+        sVoiceEngineInst = (GnVendor_PcmIn *)GnVendor_pcmInOpenHw(VOICE_ENGINE_SAMPLE_RATE,
+                                                                  VOICE_ENGINE_CHANNEL_COUNT,
+                                                                  VOICE_ENGINE_SAMPLE_BIT);
+    if (sVoiceEngineInst == nullptr || (sVoiceEngineInst->sampleRate != VOICE_ENGINE_SAMPLE_RATE ||
+                                        sVoiceEngineInst->channelCount != VOICE_ENGINE_CHANNEL_COUNT ||
+                                        sVoiceEngineInst->bitsPerSample != VOICE_ENGINE_SAMPLE_BIT))
+        OS_LOGE(TAG, "Failed to GnVendor_enableKeywordDetect");
+    sVoiceEngineInst->enableKeywordDetect = true;
+
+    return true;
+}
+
+void GnVendor_disableKeywordDetect()
+{
+    OS_LOGI(TAG, "GnVendor_disableKeywordDetect");
+
+    std::lock_guard<std::mutex> lk(sVoiceEngineLock);
+
+    if (sVoiceEngineInst != nullptr) {
+        sVoiceEngineInst->enableKeywordDetect = false;
+        if (sVoiceEngineInst->isRecording)
+            return;
+        GnVendor_pcmInCloseHW(sVoiceEngineInst);
+        sVoiceEngineInst = nullptr;
+    }
 }

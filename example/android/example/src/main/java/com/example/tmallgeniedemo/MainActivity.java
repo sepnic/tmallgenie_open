@@ -31,20 +31,23 @@ import androidx.core.app.ActivityCompat;
 
 import com.sepnic.tmallgenie.TmallGenie;
 
-import java.io.File;
-import java.io.IOException;
-
 public class MainActivity extends Activity {
     private static final String TAG = "TmallGenieDemo";
     private final Context mThisContext = this;
     private AudioManager mAudioManager = null;
     private TmallGenie mTmallGenie = null;
     private boolean mIsRecording = false;
+    private boolean mIsKeywordDetectEnabled = false;
     private TextView mCommandView;
     private TextView mStatusView;
     private TextView mAsrResultView;
     private TextView mNluResultView;
-    private String mUserinfoFile = "/storage/emulated/0/TmallGenieUserinfo.txt";
+
+    private final String mDeviceBizType = null;  // FIXME: apply for your device key from https://product.aligenie.com/
+    private final String mDeviceBizGroup = null; // FIXME: apply for your device key from https://product.aligenie.com/
+    private final String mDeviceBizSecret = null;// FIXME: apply for your device key from https://product.aligenie.com/
+    private final String mDeviceCaCert = null;   // FIXME: apply for your device key from https://product.aligenie.com/
+
     private static final int PERMISSIONS_REQUEST_CODE_AUDIO = 1;
 
     private void requestPermissions(Activity activity) {
@@ -68,43 +71,18 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void createUserinfoFile() {
-        try {
-            File cacheDir = getCacheDir();
-            if (!cacheDir.exists() && !cacheDir.mkdirs()) {
-                return;
-            }
-            File outFile = new File(cacheDir, "TmallGenieUserinfo.txt");
-            if (!outFile.exists() && !outFile.createNewFile()) {
-                return;
-            }
-            mUserinfoFile = outFile.getAbsolutePath();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     private final AudioManager.OnAudioFocusChangeListener mAudioFocusChange = new
             AudioManager.OnAudioFocusChangeListener() {
                 @Override
                 public void onAudioFocusChange(int focusChange) {
                     switch (focusChange) {
                         case AudioManager.AUDIOFOCUS_GAIN:
-                            if (mTmallGenie != null) {
-                                mTmallGenie.native_onSpeakerMutedChanged(false);
-                            }
                             break;
                         case AudioManager.AUDIOFOCUS_LOSS:
-                            if (mTmallGenie != null) {
-                                mTmallGenie.stopService();
-                            }
-                            mAudioManager.abandonAudioFocus(mAudioFocusChange);
                             break;
                         case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                            break;
                         case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                            if (mTmallGenie != null) {
-                                mTmallGenie.native_onSpeakerMutedChanged(true);
-                            }
                             break;
                     }
                 }
@@ -117,8 +95,6 @@ public class MainActivity extends Activity {
 
         requestPermissions(this);
 
-        createUserinfoFile();
-
         mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
         if (mAudioManager != null)
             mAudioManager.requestAudioFocus(mAudioFocusChange, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
@@ -128,16 +104,14 @@ public class MainActivity extends Activity {
         mNluResultView = findViewById(R.id.nluResultView);
         mStatusView = findViewById(R.id.statusView);
 
-        mTmallGenie = new TmallGenie();
+        mTmallGenie = new TmallGenie(this, mDeviceBizType, mDeviceBizGroup, mDeviceBizSecret, mDeviceCaCert);
         mTmallGenie.setCommandListener(mCommandListener);
         mTmallGenie.setStatusListener(mStatusListener);
         mTmallGenie.setAsrResultListener(mAsrResultListener);
         mTmallGenie.setNluResultListener(mNluResultListener);
         mTmallGenie.setMemberQrCodeListener(mMemberQrCodeListener);
-        if (mTmallGenie.init(mUserinfoFile, WifiUtils.getMacAddress(this)) && mTmallGenie.startService()) {
-            // todo: monitor network status
-            mTmallGenie.native_onNetworkConnected();
-        } else {
+
+        if (!mTmallGenie.startService()) {
             Toast.makeText(this, "Failed to start tmallgenie service", Toast.LENGTH_LONG).show();
         }
     }
@@ -156,6 +130,21 @@ public class MainActivity extends Activity {
             mTmallGenie.startRecord();
         } else {
             mTmallGenie.stopRecord();
+        }
+    }
+
+    public void onKeywordDetectClick(View view) {
+        if (!mIsKeywordDetectEnabled) {
+            if (mTmallGenie.native_enableKeywordDetect()) {
+                mIsKeywordDetectEnabled = true;
+                Toast.makeText(this, "Keyword-detect: enabled", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "Keyword-detect: failed to enable", Toast.LENGTH_LONG).show();
+            }
+        } else {
+            mTmallGenie.native_disableKeywordDetect();
+            mIsKeywordDetectEnabled = false;
+            Toast.makeText(this, "Keyword-detect: disabled", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -213,15 +202,11 @@ public class MainActivity extends Activity {
     };
 
     private final TmallGenie.OnAsrResultListener mAsrResultListener = new TmallGenie.OnAsrResultListener() {
-        public void onAsrResult(String result) {
-            mAsrResultView.setText(result);
-        }
+        public void onAsrResult(String result) { mAsrResultView.setText(result); }
     };
 
     private final TmallGenie.OnNluResultListener mNluResultListener = new TmallGenie.OnNluResultListener() {
-        public void onNluResult(String result) {
-            mNluResultView.setText(result);
-        }
+        public void onNluResult(String result) { mNluResultView.setText(result); }
     };
 
     private final TmallGenie.OnMemberQrCodeListener mMemberQrCodeListener = new TmallGenie.OnMemberQrCodeListener() {

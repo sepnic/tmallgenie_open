@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.example.tmallgeniedemo;
+package com.sepnic.tmallgenie;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
-
-import androidx.annotation.NonNull;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -32,26 +32,51 @@ import java.net.NetworkInterface;
 import java.util.Collections;
 import java.util.List;
 
-public class WifiUtils {
-    public static String getMacAddress(@NonNull Context context) {
+public class NetworkUtils {
+    public static boolean isMobileConnected(Context context) {
+        ConnectivityManager connectivityManager =
+                (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo mobileNetworkInfo =
+                connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+        if (mobileNetworkInfo != null) {
+            return mobileNetworkInfo.isAvailable();
+        }
+        return false;
+    }
+
+    public static boolean isWifiConnected(Context context) {
+        ConnectivityManager connectivityManager =
+                (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo wiFiNetworkInfo =
+                connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+        if (wiFiNetworkInfo != null) {
+            return wiFiNetworkInfo.isAvailable();
+        }
+        return false;
+    }
+
+    public static String getWifiMac(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            return getMacAddressFromWifiService(context);
+            return getWifiMacFromWifiService(context);
         } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            return getMacAddressFromSysFile();
+            return getWifiMacFromSysFile();
         } else {
-            return getMacAddressFromNetworkInterface();
+            return getWifiMacFromNetworkInterface();
         }
     }
 
     @SuppressLint("HardwareIds")
-    private static String getMacAddressFromWifiService(@NonNull Context context) {
-        WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+    private static String getWifiMacFromWifiService(Context context) {
+        WifiManager wifiManager =
+                (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-        return wifiInfo.getMacAddress();
+        if (wifiInfo != null)
+            return wifiInfo.getMacAddress();
+        return null;
     }
 
-    private static String getMacAddressFromSysFile() {
-        String WifiAddress = "02:00:00:00:00:00";
+    private static String getWifiMacFromSysFile() {
+        String WifiAddress = null;
         try {
             WifiAddress = new BufferedReader(new FileReader(new File("/sys/class/net/wlan0/address"))).readLine();
         } catch (IOException e) {
@@ -60,7 +85,7 @@ public class WifiUtils {
         return WifiAddress;
     }
 
-    private static String getMacAddressFromNetworkInterface() {
+    private static String getWifiMacFromNetworkInterface() {
         try {
             List<NetworkInterface> all = Collections.list(NetworkInterface.getNetworkInterfaces());
             for (NetworkInterface nif : all) {

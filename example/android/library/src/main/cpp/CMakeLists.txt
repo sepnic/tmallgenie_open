@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.4.1)
 project(tmallgenie_demo)
 
+option(ENABLE_LITEVAD_SPEECH_DETECT  "Enable litevad speech detect"  "ON")
+
 set(TOP_DIR             "${CMAKE_SOURCE_DIR}/../../../../../..")
 set(SYSUTILS_DIR        "${TOP_DIR}/thirdparty/sysutils")
 set(MBEDTLS_DIR         "${TOP_DIR}/thirdparty/mbedtls")
 set(LITEPLAYER_DIR      "${TOP_DIR}/thirdparty/liteplayer")
-set(LITEVAD_DIR         "${TOP_DIR}/thirdparty/litevad")
 set(SPEEX_DIR           "${TOP_DIR}/thirdparty/speex")
 set(TMALLGENIE_DIR      "${TOP_DIR}")
 
@@ -18,7 +19,6 @@ include_directories(${TMALLGENIE_DIR}/include)
 include_directories(${SYSUTILS_DIR}/include)
 include_directories(${MBEDTLS_DIR}/include)
 include_directories(${LITEPLAYER_DIR}/include)
-include_directories(${LITEVAD_DIR}/include)
 include_directories(${SPEEX_DIR}/include)
 
 # tmallgenie_open files
@@ -64,27 +64,6 @@ add_library(speex STATIC ${SPEEX_SRC})
 target_compile_options(speex PRIVATE
     -DFIXED_POINT -DUSE_KISS_FFT -DEXPORT= -DSPEEX_HAVE_SYSUTILS_ENABLED)
 
-# litevad files
-set(LITEVAD_SRC
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/energy.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/division_operations.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/get_scaling_square.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample_48khz.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample_by_2.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample_by_2_internal.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample_fractional.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/vad_core.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/vad_filterbank.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/vad_gmm.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/vad_sp.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/webrtc_vad.c
-    ${LITEVAD_DIR}/thirdparty/webrtc/src/resampler/resampler.cc
-    ${LITEVAD_DIR}/src/litevad.c)
-add_library(litevad STATIC ${LITEVAD_SRC})
-target_include_directories(litevad PRIVATE ${LITEVAD_DIR}/thirdparty/webrtc/inc)
-target_compile_options(litevad PRIVATE -DLITEVAD_HAVE_SYSUTILS_ENABLED)
-
 # liteplayer_core
 add_library(liteplayer_core STATIC IMPORTED)
 set_target_properties(liteplayer_core PROPERTIES IMPORTED_LOCATION "${LITEPLAYER_DIR}/lib/android/${ANDROID_ABI}/libliteplayer_core.a")
@@ -101,5 +80,34 @@ set(JNI_SRC
     lockfree_ringbuf.c)
 add_library(tmallgenie-jni SHARED ${JNI_SRC})
 target_link_libraries(tmallgenie-jni
-    tmallgenie_open tmallgenie_core liteplayer_core litevad speex sysutils mbedtls
+    tmallgenie_open tmallgenie_core liteplayer_core speex sysutils mbedtls
     OpenSLES android log)
+
+if(ENABLE_LITEVAD_SPEECH_DETECT)
+    set(LITEVAD_DIR "${TOP_DIR}/thirdparty/litevad")
+    include_directories(${LITEVAD_DIR}/include)
+
+    # litevad
+    set(LITEVAD_SRC
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/energy.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/division_operations.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/get_scaling_square.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample_48khz.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample_by_2.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample_by_2_internal.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/resample_fractional.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/vad_core.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/vad_filterbank.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/vad_gmm.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/vad_sp.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/vad/webrtc_vad.c
+        ${LITEVAD_DIR}/thirdparty/webrtc/src/resampler/resampler.cc
+        ${LITEVAD_DIR}/src/litevad.c)
+    add_library(litevad STATIC ${LITEVAD_SRC})
+    target_include_directories(litevad PRIVATE ${LITEVAD_DIR}/thirdparty/webrtc/inc)
+    target_compile_options(litevad PRIVATE -DLITEVAD_HAVE_SYSUTILS_ENABLED)
+
+    target_compile_options(tmallgenie-jni PRIVATE -DGENIE_HAVE_LITEVAD_SPEECH_DETECT_ENABLED)
+    target_link_libraries(tmallgenie-jni litevad)
+endif()

@@ -128,7 +128,7 @@ contiune_read:
 
     if (!priv->first_request) {
         if (priv->content_pos > 0) {
-            char tmp_buf[32] = {0};
+            char tmp_buf[64] = {0};
             snprintf(tmp_buf, sizeof(tmp_buf), "Range: bytes=%ld-\r\n", (long)priv->content_pos);
             OS_LOGV(TAG, "Set http range: %s", tmp_buf);
             httpclient_set_custom_header(client, tmp_buf);

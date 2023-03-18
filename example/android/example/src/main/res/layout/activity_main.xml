@@ -71,10 +71,21 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_above="@+id/statusView"
-        android:layout_centerHorizontal="true"
+        android:layout_alignParentStart="true"
         android:layout_marginBottom="5dp"
         android:onClick="onRecordClick"
-        android:text="Start/Stop Recording"
+        android:text="Record"
+        android:textAllCaps="false" />
+
+    <Button
+        android:id="@+id/keywordDetectButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/statusView"
+        android:layout_alignParentEnd="true"
+        android:layout_marginBottom="5dp"
+        android:onClick="onKeywordDetectClick"
+        android:text="KeywordDetect"
         android:textAllCaps="false" />
 
     <TextView

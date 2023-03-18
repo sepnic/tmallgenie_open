@@ -16,11 +16,30 @@
 
 package com.sepnic.tmallgenie;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.media.AudioManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkRequest;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
+import android.util.Log;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.ref.WeakReference;
 
 public class TmallGenie {
@@ -93,26 +112,124 @@ public class TmallGenie {
     private static final int WHAT_GENIE_STATUS      = 0x01;
     private static final int WHAT_GENIE_ASRRESULT   = 0x02;
     private static final int WHAT_GENIE_NLURESULT   = 0x03;
-    private static final int WHAT_GENIE_QRCODE      = 0x04;
 
     private final static String TAG = "TmallGenieJava";
+    private final Context mContext;
+    private final AudioManager mAudioManager;
     private final EventHandler mEventHandler;
     private HandlerThread mHandlerThread;
-    private boolean mIsInited = false;
 
-    public TmallGenie() {
+    private final String mBizType;
+    private final String mBizGroup;
+    private final String mBizSecret;
+    private final String mCaCert;
+    private String mUserInfoFile = "/storage/emulated/0/TmallGenieUserInfo.txt";
+    private String mUuid = null;
+    private String mAccessToken = null;
+
+    private boolean mIsCreated = false;
+    private boolean mIsStarted = false;
+
+    private void createUserInfoFile(Context context) {
+        try {
+            File cacheDir = context.getCacheDir();
+            if (!cacheDir.exists() && !cacheDir.mkdirs()) {
+                return;
+            }
+            File file = new File(cacheDir, "TmallGenieUserInfo.txt");
+            if (!file.exists() && !file.createNewFile()) {
+                return;
+            }
+            mUserInfoFile = file.getAbsolutePath();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void readUserInfoFile(Context context) {
+        try {
+            FileInputStream fis = new FileInputStream(mUserInfoFile);
+            BufferedReader br = new BufferedReader(new InputStreamReader(fis));
+            StringBuilder builder = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) {
+                builder.append(line);
+            }
+            br.close();
+            fis.close();
+
+            String content = builder.toString();
+            if (!content.isEmpty()) {
+                JSONObject root = new JSONObject(content);
+                mUuid = root.getString("uuid");
+                mAccessToken = root.getString("accessToken");
+            }
+        } catch (IOException | JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public TmallGenie(Context context, String bizType, String bizGroup, String bizSecret, String caCert) {
         Looper looper;
         if ((looper = Looper.myLooper()) == null && (looper = Looper.getMainLooper()) == null) {
             mHandlerThread = new HandlerThread("TmallGenieEventThread");
             mHandlerThread.start();
             looper = mHandlerThread.getLooper();
         }
-        mEventHandler = new EventHandler(this, looper);
+        mEventHandler = new EventHandler(looper);
+
+        mContext = context.getApplicationContext();
+        mBizType = bizType;
+        mBizGroup = bizGroup;
+        mBizSecret = bizSecret;
+        mCaCert = caCert;
+
+        createUserInfoFile(mContext);
+        readUserInfoFile(mContext);
+
+        mAudioManager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+
+        VolumeChangedReceiver volumeReceiver = new VolumeChangedReceiver();
+        IntentFilter filter = new IntentFilter();
+        filter.addAction("android.media.VOLUME_CHANGED_ACTION");
+        mContext.registerReceiver(volumeReceiver, filter);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            ConnectivityManager connectivityManager = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (connectivityManager != null) {
+                connectivityManager.requestNetwork(new NetworkRequest.Builder().build(), new ConnectivityManager.NetworkCallback() {
+                    @Override
+                    public void onAvailable(Network network) {
+                        super.onAvailable(network);
+                        native_onNetworkConnected();
+                    }
+
+                    @Override
+                    public void onLost(Network network) {
+                        super.onLost(network);
+                        native_onNetworkDisconnected();
+                    }
+                });
+            }
+        }
+    }
+
+    private class VolumeChangedReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals("android.media.VOLUME_CHANGED_ACTION")) {
+                if (mAudioManager != null) {
+                    int maxVolume  = mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                    int curVolume = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+                    native_onSpeakerVolumeChanged(curVolume*100/maxVolume);
+                }
+            }
+        }
     }
 
     private class EventHandler extends Handler {
 
-        public EventHandler(TmallGenie p, Looper looper) {
+        public EventHandler(Looper looper) {
             super(looper);
         }
 
@@ -120,40 +237,98 @@ public class TmallGenie {
         public void handleMessage(Message msg) {
             switch(msg.what) {
                 case WHAT_GENIE_COMMAND:
-                    if (mOnCommandListener != null)
+                    boolean handled = handleCommand(msg.arg1, msg.arg2, (String)msg.obj);
+                    if (!handled && mOnCommandListener != null)
                         mOnCommandListener.onCommand(msg.arg1, msg.arg2, (String)msg.obj);
-                    return;
+                    break;
                 case WHAT_GENIE_STATUS:
                     if (mOnStatusListener != null)
                         mOnStatusListener.onStatus(msg.arg1);
-                    return;
+                    break;
                 case WHAT_GENIE_ASRRESULT:
                     if (mOnAsrResultListener != null)
                         mOnAsrResultListener.onAsrResult((String)msg.obj);
-                    return;
-
+                    break;
                 case WHAT_GENIE_NLURESULT:
                     if (mOnNluResultListener != null)
                         mOnNluResultListener.onNluResult((String)msg.obj);
-                    return;
-
-                case WHAT_GENIE_QRCODE:
-                    if (mOnMemberQrCodeListener != null)
-                        mOnMemberQrCodeListener.onMemberQrCode((String)msg.obj);
-                    return;
-
+                    break;
                 default:
-                    return;
+                    break;
             }
         }
+    }
+
+    private boolean handleCommand(int domain, int command, String payload) {
+        switch (command) {
+            case GENIE_COMMAND_GuestDeviceActivateResp:
+            case GENIE_COMMAND_MemberDeviceActivateResp:
+                try {
+                    JSONObject root = new JSONObject(payload);
+                    mUuid = root.getString("uuid");
+                    mAccessToken = root.getString("accessToken");
+                    FileOutputStream fos = new FileOutputStream(mUserInfoFile);
+                    fos.write(payload.getBytes());
+                    fos.close();
+                } catch (JSONException | IOException e) {
+                    e.printStackTrace();
+                }
+                return true;
+            case GENIE_COMMAND_UserInfoResp:
+                try {
+                    JSONObject root = new JSONObject(payload);
+                    String userType = root.getString("userType");
+                    if (userType.equals("guest")) {
+                        String qrCode = root.getString("qrCode");
+                        if (mOnMemberQrCodeListener != null)
+                            mOnMemberQrCodeListener.onMemberQrCode(qrCode);
+                        return true;
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                break;
+            default:
+                break;
+        }
+        return false;
     }
 
     /*
      * Called from native code when an interesting event happens.  This method
      * just uses the EventHandler system to post the event back to the main app thread.
      */
+
+    private static int onGetVolumeFromNative(Object tmallgenie_ref) {
+        TmallGenie p = (TmallGenie)((WeakReference<?>)tmallgenie_ref).get();
+        if (p == null) {
+            return -1;
+        }
+        if (p.mAudioManager != null) {
+            int maxVolume  = p.mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            int curVolume = p.mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            return curVolume*100/maxVolume;
+        }
+        return -1;
+    }
+
+    private static boolean onSetVolumeFromNative(Object tmallgenie_ref, int volumePercent) {
+        TmallGenie p = (TmallGenie)((WeakReference<?>)tmallgenie_ref).get();
+        if (p == null) {
+            return false;
+        }
+        if (p.mAudioManager != null) {
+            int maxVolume  = p.mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            int setVolume = volumePercent*maxVolume/100;
+            setVolume = setVolume > 0 ? setVolume : 1;
+            p.mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, setVolume, 0);
+            return true;
+        }
+        return false;
+    }
+
     private static void onCommandFromNative(Object tmallgenie_ref, int domain, int command, String payload) {
-        TmallGenie p = (TmallGenie)((WeakReference)tmallgenie_ref).get();
+        TmallGenie p = (TmallGenie)((WeakReference<?>)tmallgenie_ref).get();
         if (p == null) {
             return;
         }
@@ -164,7 +339,7 @@ public class TmallGenie {
     }
 
     private static void onStatusFromNative(Object tmallgenie_ref, int status) {
-        TmallGenie p = (TmallGenie)((WeakReference)tmallgenie_ref).get();
+        TmallGenie p = (TmallGenie)((WeakReference<?>)tmallgenie_ref).get();
         if (p == null) {
             return;
         }
@@ -175,7 +350,7 @@ public class TmallGenie {
     }
 
     private static void onAsrResultFromNative(Object tmallgenie_ref, String result) {
-        TmallGenie p = (TmallGenie)((WeakReference)tmallgenie_ref).get();
+        TmallGenie p = (TmallGenie)((WeakReference<?>)tmallgenie_ref).get();
         if (p == null) {
             return;
         }
@@ -186,7 +361,7 @@ public class TmallGenie {
     }
 
     private static void onNluResultFromNative(Object tmallgenie_ref, String result) {
-        TmallGenie p = (TmallGenie)((WeakReference)tmallgenie_ref).get();
+        TmallGenie p = (TmallGenie)((WeakReference<?>)tmallgenie_ref).get();
         if (p == null) {
             return;
         }
@@ -196,119 +371,109 @@ public class TmallGenie {
         }
     }
 
-    private static void onMemberQrCodeFromNative(Object tmallgenie_ref, String qrcode) {
-        TmallGenie p = (TmallGenie)((WeakReference)tmallgenie_ref).get();
-        if (p == null) {
-            return;
+    public boolean startService() throws IllegalArgumentException {
+        if (!mIsCreated) {
+            String wifiMac = NetworkUtils.getWifiMac(mContext);
+            if (wifiMac == null)
+                Log.e(TAG, "Unable to get wifi mac, will throw exception");
+
+            if (native_create(new WeakReference<TmallGenie>(this), wifiMac, mBizType, mBizGroup, mBizSecret, mCaCert, mUuid, mAccessToken))
+                mIsCreated = true;
+            else
+                Log.e(TAG, "Failed to init genie service");
         }
-        if (p.mEventHandler != null) {
-            Message m = p.mEventHandler.obtainMessage(WHAT_GENIE_QRCODE, 0, 0, qrcode);
-            p.mEventHandler.sendMessage(m);
+
+        if (mIsCreated && !mIsStarted) {
+            if (native_start()) {
+                mIsStarted = true;
+                if (mAudioManager != null) {
+                    int maxVolume = mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                    int curVolume = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+                    native_onSpeakerVolumeChanged(curVolume * 100 / maxVolume);
+                }
+                if (NetworkUtils.isMobileConnected(mContext) || NetworkUtils.isWifiConnected(mContext))
+                    native_onNetworkConnected();
+                else
+                    Log.e(TAG, "Unable to send NetworkConnected event because network disconnected");
+            } else {
+                Log.e(TAG, "Failed to start genie service");
+            }
         }
-    }
-
-    public interface OnCommandListener {
-        void onCommand(int domain, int command, String payload);
-    }
-    public void setCommandListener(OnCommandListener listener) {
-        mOnCommandListener = listener;
-    }
-    private OnCommandListener mOnCommandListener = null;
-
-    public interface OnStatusListener {
-        void onStatus(int status);
-    }
-    public void setStatusListener(OnStatusListener listener) {
-        mOnStatusListener = listener;
-    }
-    private OnStatusListener mOnStatusListener = null;
-
-    public interface OnAsrResultListener {
-        void onAsrResult(String result);
-    }
-    public void setAsrResultListener(OnAsrResultListener listener) {
-        mOnAsrResultListener = listener;
-    }
-    private OnAsrResultListener mOnAsrResultListener = null;
-
-    public interface OnNluResultListener {
-        void onNluResult(String result);
-    }
-    public void setNluResultListener(OnNluResultListener listener) {
-        mOnNluResultListener = listener;
-    }
-    private OnNluResultListener mOnNluResultListener = null;
-
-    public interface OnMemberQrCodeListener {
-        void onMemberQrCode(String qrcode);
-    }
-    public void setMemberQrCodeListener(OnMemberQrCodeListener listener) {
-        mOnMemberQrCodeListener = listener;
-    }
-    private OnMemberQrCodeListener mOnMemberQrCodeListener = null;
-
-    public boolean init(String userinfoFile, String wifiMac) throws IllegalArgumentException {
-        if (!mIsInited) {
-            if (native_create(new WeakReference<TmallGenie>(this), userinfoFile, wifiMac))
-                mIsInited = true;
-        }
-        return mIsInited;
-    }
-
-    public boolean startService() {
-        if (mIsInited)
-            return native_start();
-        else
-            return false;
+        return mIsStarted;
     }
 
     public void stopService() {
-        if (mIsInited)
+        if (mIsStarted) {
             native_stop();
+            mIsStarted = false;
+        }
     }
 
     public void release() {
-        if (mIsInited)
-            native_destroy();
-        if (mHandlerThread != null) {
+        if (mHandlerThread != null)
             mHandlerThread.quitSafely();
-        }
+        native_destroy();
         mOnCommandListener = null;
         mOnStatusListener = null;
         mOnAsrResultListener = null;
         mOnNluResultListener = null;
         mOnMemberQrCodeListener = null;
-        mIsInited = false;
+        mIsCreated = false;
+        mIsStarted = false;
     }
 
-    public void startRecord() {
-        if (mIsInited)
-            native_onMicphoneWakeup("tianmaojingling", 0, 0.618);
-    }
+    public void startRecord() { native_onMicphoneWakeup("tian mao jing ling", 0, 0.618); }
 
-    public void stopRecord() {
-        if (mIsInited)
-            native_onMicphoneSilence();
-    }
+    public void stopRecord() { native_onMicphoneSilence(); }
+
+    public void mute() { native_onSpeakerMutedChanged(true); }
+
+    public void unmute() { native_onSpeakerMutedChanged(false); }
+
+    public interface OnCommandListener { void onCommand(int domain, int command, String payload); }
+    public void setCommandListener(OnCommandListener listener) { mOnCommandListener = listener; }
+    private OnCommandListener mOnCommandListener = null;
+
+    public interface OnStatusListener { void onStatus(int status); }
+    public void setStatusListener(OnStatusListener listener) { mOnStatusListener = listener; }
+    private OnStatusListener mOnStatusListener = null;
+
+    public interface OnAsrResultListener { void onAsrResult(String result); }
+    public void setAsrResultListener(OnAsrResultListener listener) { mOnAsrResultListener = listener; }
+    private OnAsrResultListener mOnAsrResultListener = null;
+
+    public interface OnNluResultListener { void onNluResult(String result); }
+    public void setNluResultListener(OnNluResultListener listener) { mOnNluResultListener = listener; }
+    private OnNluResultListener mOnNluResultListener = null;
+
+    public interface OnMemberQrCodeListener { void onMemberQrCode(String qrcode); }
+    public void setMemberQrCodeListener(OnMemberQrCodeListener listener) { mOnMemberQrCodeListener = listener; }
+    private OnMemberQrCodeListener mOnMemberQrCodeListener = null;
 
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    private native boolean native_create(Object tmallgenie_this, String userinfoFile, String wifiMac)
-            throws IllegalArgumentException;
+    private native boolean native_create(Object tmallgenie_this, String wifiMac,
+                                         String bizType, String bizGroup, String bizSecret, String caCert,
+                                         String uuid, String accessToken) throws IllegalArgumentException;
     private native void native_destroy();
     private native boolean native_start();
     private native void native_stop();
+
     private native void native_onMicphoneWakeup(String wakeupWord, int doa, double confidence) throws IllegalArgumentException;
     private native void native_onMicphoneSilence();
+    private native void native_onSpeakerVolumeChanged(int volume);
+    private native void native_onSpeakerMutedChanged(boolean muted);
 
     public native void native_onNetworkConnected();
     public native void native_onNetworkDisconnected();
-    public native void native_onSpeakerVolumeChanged(int volume);
-    public native void native_onSpeakerMutedChanged(boolean muted);
+
     public native void native_onQueryUserInfo();
     public native void native_onTextRecognize(String inputText) throws IllegalArgumentException;
+
+    public native boolean native_enableKeywordDetect();
+    public native void native_disableKeywordDetect();
 
     // Used to load the 'native-lib' library on application startup.
     static {

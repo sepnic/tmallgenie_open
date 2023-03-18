@@ -22,7 +22,6 @@
 #define TAG "[liteplayer]file"
 
 struct file_priv {
-    const char *url;
     FILE *file;
     long content_pos;
     long content_len;
@@ -50,7 +49,6 @@ source_handle_t file_wrapper_open(const char *url, long long content_pos, void *
         return NULL;
     }
 
-    priv->url = url;
     priv->file = file;
     priv->content_pos = (long)content_pos;
 

@@ -13,154 +13,131 @@
 // limitations under the License.
 
 #include <cstdio>
-#include <cstring>
-#include "json/cJSON.h"
-#include "cutils/memory_helper.h"
+#include <string>
 #include "cutils/log_helper.h"
 #include "GenieVendor_Android.h"
 
 #define TAG "GenieVendorAndroid"
 
-static char sGnAccountFile[256];
-static bool sGnAccountAuthorized = false;
-static char sGnAccountUuid[512];
-static char sGnAccountAccessToken[512];
-static char sGnWifiMac[32];
+static std::string sGnAccountUuid;
+static std::string sGnAccountAccessToken;
+
+static std::string sGnDeviceWifiMac;
+static std::string sGnDeviceBizType;
+static std::string sGnDeviceBizGroup;
+static std::string sGnDeviceBizSecret;
+static std::string sGnDeviceCaCert;
+
 static int  sGnSpeakerVolume = 50;
 static bool sGnSpeakerMuted  = false;
 
 // vendor init
-bool GnVendor_init(const char *userinfoFile, const char *wifiMac)
+bool GnVendor_init(const char *wifiMac,
+                   const char *bizType, const char *bizGroup, const char *bizSecret, const char *caCert,
+                   const char *uuid, const char *accessToken)
 {
-    // todo: get biz and account info from java layer, don't fix biz info in jni
-    if (userinfoFile != nullptr) {
-        snprintf(sGnAccountFile, sizeof(sGnAccountFile), "%s", userinfoFile);
-        cJSON *rootJson = nullptr;
-        FILE *file = nullptr;
-        do {
-            char buffer[1024] = {0};
-            cJSON *uuidJson = nullptr, *accessTokenJson = nullptr;
-            char *uuidStr = nullptr, *accessTokenStr = nullptr;
-            file = fopen(userinfoFile, "rb");
-            if (file == nullptr)
-                break;
-            if (fread(buffer, 1, sizeof(buffer), file) <= 0)
-                break;
-            if ((rootJson = cJSON_Parse(buffer)) == nullptr ||
-                (uuidJson = cJSON_GetObjectItem(rootJson, "uuid")) == nullptr ||
-                (accessTokenJson = cJSON_GetObjectItem(rootJson, "accessToken")) == nullptr)
-                break;
-            if ((uuidStr = cJSON_GetStringValue(uuidJson)) == nullptr ||
-                (accessTokenStr = cJSON_GetStringValue(accessTokenJson)) == nullptr)
-                break;
-            snprintf(sGnAccountUuid, sizeof(sGnAccountUuid), "%s", uuidStr);
-            snprintf(sGnAccountAccessToken, sizeof(sGnAccountAccessToken), "%s", accessTokenStr);
-            sGnAccountAuthorized = true;
-            OS_LOGI(TAG, "Successfully read account info from TmallGenieUserinfo.txt: uuid=%s, accessToken=%s", uuidStr, accessTokenStr);
-        } while (false);
-        if (rootJson != nullptr)
-            cJSON_Delete(rootJson);
-        if (file != nullptr)
-            fclose(file);
-    } else {
-        snprintf(sGnAccountFile, sizeof(sGnAccountFile), "%s", "/storage/emulated/0/TmallGenieUserinfo.txt");
-    }
     if (wifiMac != nullptr) {
-        snprintf(sGnWifiMac, sizeof(sGnWifiMac), "%s", wifiMac);
-        OS_LOGI(TAG, "Successfully read wifi mac address: mac=%s", wifiMac);
+        sGnDeviceWifiMac = wifiMac;
+        OS_LOGI(TAG, "WifiMac: %s", sGnDeviceWifiMac.c_str());
     } else {
-        OS_LOGE(TAG, "Invalid wifi mac address, abort...");
+        OS_LOGE(TAG, "Invalid WifiMac address, abort...");
         return false;
     }
+
+    if (bizType != nullptr && bizGroup != nullptr && bizSecret != nullptr && caCert != nullptr) {
+        // IMPORTANT: DO NOT EXPOSE THESE CONFIDENTIAL DATA
+        sGnDeviceBizType = bizType;
+        sGnDeviceBizGroup = bizGroup;
+        sGnDeviceBizSecret = bizSecret;
+        sGnDeviceCaCert = caCert;
+    } else {
+        OS_LOGE(TAG, "Invalid biz information, but will go ahead with default biz");
+    }
+
+    if (uuid != nullptr && accessToken != nullptr) {
+        sGnAccountUuid = uuid;
+        sGnAccountAccessToken = accessToken;
+        // uuid and accessToken are also confidential, but they have been encrypted in GenieInteractionService
+        OS_LOGI(TAG, "ExistedAccount: uuid=%s, accessToken=%s", sGnAccountUuid.c_str(), sGnAccountAccessToken.c_str());
+    }
+
+    sGnSpeakerMuted = false;
     return true;
 }
 
 // system & account info
 const char *GnVendor_bizType()
 {
-    // FIXME: apply for your device key from https://product.aligenie.com/
-    return nullptr;
+    if (sGnDeviceBizType.empty())
+        return nullptr;
+    else
+        return sGnDeviceBizType.c_str();
 }
 
 const char *GnVendor_bizGroup()
 {
-    // FIXME: apply for your device key from https://product.aligenie.com/
-    return nullptr;
+    if (sGnDeviceBizGroup.empty())
+        return nullptr;
+    else
+        return sGnDeviceBizGroup.c_str();
 }
 
 const char *GnVendor_bizSecret()
 {
-    // FIXME: apply for your device key from https://product.aligenie.com/
-    return nullptr;
+    if (sGnDeviceBizSecret.empty())
+        return nullptr;
+    else
+        return sGnDeviceBizSecret.c_str();
 }
 
 const char *GnVendor_caCert()
 {
-    // FIXME: apply for your device key from https://product.aligenie.com/
-    return nullptr;
+    if (sGnDeviceCaCert.empty())
+        return nullptr;
+    else
+        return sGnDeviceCaCert.c_str();
 }
 
 const char *GnVendor_macAddr()
 {
-    return sGnWifiMac;
+    return sGnDeviceWifiMac.c_str();
 }
 
 const char *GnVendor_uuid()
 {
-    if (sGnAccountAuthorized)
-        return sGnAccountUuid;
-    else
+    if (sGnAccountUuid.empty())
         return nullptr;
+    else
+        return sGnAccountUuid.c_str();
 }
 
 const char *GnVendor_accessToken()
 {
-    if (sGnAccountAuthorized)
-        return sGnAccountAccessToken;
-    else
+    if (sGnAccountAccessToken.empty())
         return nullptr;
-}
-
-void GnVendor_updateAccount(const char *uuid, const char *accessToken)
-{
-    if (uuid == nullptr || accessToken == nullptr)
-        return;
-    char buffer[1024];
-    cJSON *rootJson = cJSON_CreateObject();
-    cJSON_AddItemToObject(rootJson, "uuid", cJSON_CreateString(uuid));
-    cJSON_AddItemToObject(rootJson, "accessToken", cJSON_CreateString(accessToken));
-    memset(buffer, 0x0, sizeof(buffer));
-    cJSON_PrintPreallocated(rootJson, buffer, sizeof(buffer), false);
-    FILE *file = fopen(sGnAccountFile, "wb+");
-    if (file != nullptr) {
-        fwrite(buffer, 1, strlen(buffer)+1, file);
-        fclose(file);
-    }
-    cJSON_Delete(rootJson);
-
-    if (strlen(uuid) < sizeof(sGnAccountUuid) &&
-        strlen(accessToken) < sizeof(sGnAccountAccessToken)) {
-        snprintf(sGnAccountUuid, sizeof(sGnAccountUuid), "%s", uuid);
-        snprintf(sGnAccountAccessToken, sizeof(sGnAccountAccessToken), "%s", accessToken);
-        sGnAccountAuthorized = true;
-    }
+    else
+        return sGnAccountAccessToken.c_str();
 }
 
 bool GnVendor_setSpeakerVolume(int volume)
 {
-    // TODO: set stream volume
-    sGnSpeakerVolume = volume;
-    return true;
+    if (TmallGenie_onSetVolume(volume)) {
+        sGnSpeakerVolume = volume;
+        return true;
+    }
+    return  false;
 }
 
 int GnVendor_getSpeakerVolume()
 {
+    int volume = TmallGenie_onGetVolume();
+    if (volume >= 0)
+        sGnSpeakerVolume = volume;
     return sGnSpeakerVolume;
 }
 
 bool GnVendor_setSpeakerMuted(bool muted)
 {
-    // TODO: set stream mute
     sGnSpeakerMuted = muted;
     return true;
 }
