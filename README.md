@@ -7,6 +7,9 @@
 **演示视频：**
  - [MacOSX 精灵语音助手](https://www.bilibili.com/video/BV1Na411q7o8)
  - [ESP32 精灵智能音箱](https://www.bilibili.com/video/BV1q34y1C7CA)
+ - Android 精灵语音助手截图
+
+![GenieAndroidDemo](https://github.com/sepnic/tmallgenie_open/blob/master/GenieAndroidDemo.png)
 
 **编译运行：**
 - MacOSX/Ubuntu/raspberry-pi：[How to build tmallgenie for macosx/ubuntu/raspberry-pi](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/README.md)
