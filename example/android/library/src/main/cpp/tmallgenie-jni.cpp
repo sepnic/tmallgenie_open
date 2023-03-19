@@ -16,6 +16,7 @@
 
 #include <jni.h>
 #include <cstdio>
+#include <cassert>
 #include <string>
 #include "cutils/memory_helper.h"
 #include "cutils/log_helper.h"
