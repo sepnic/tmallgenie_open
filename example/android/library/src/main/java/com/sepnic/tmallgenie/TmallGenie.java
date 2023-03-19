@@ -327,6 +327,16 @@ public class TmallGenie {
         return false;
     }
 
+    private static void onFeedVoiceEngineFromNative(Object tmallgenie_ref, byte[] buffer, int size) {
+        TmallGenie p = (TmallGenie)((WeakReference<?>)tmallgenie_ref).get();
+        if (p == null) {
+            return;
+        }
+        if (p.mOnRecordDataListener != null) {
+            p.mOnRecordDataListener.onRecordData(buffer, size);
+        }
+    }
+
     private static void onCommandFromNative(Object tmallgenie_ref, int domain, int command, String payload) {
         TmallGenie p = (TmallGenie)((WeakReference<?>)tmallgenie_ref).get();
         if (p == null) {
@@ -418,6 +428,7 @@ public class TmallGenie {
         mOnAsrResultListener = null;
         mOnNluResultListener = null;
         mOnMemberQrCodeListener = null;
+        mOnRecordDataListener = null;
         mIsCreated = false;
         mIsStarted = false;
     }
@@ -429,6 +440,16 @@ public class TmallGenie {
     public void mute() { native_onSpeakerMutedChanged(true); }
 
     public void unmute() { native_onSpeakerMutedChanged(false); }
+
+    public boolean startVoiceEngine(int sampleRate, int ChannelCount, int bitsPerSample, OnRecordDataListener listener) {
+        mOnRecordDataListener = listener;
+        return native_startVoiceEngine(sampleRate, ChannelCount, bitsPerSample);
+    }
+
+    public void stopVoiceEngine() {
+        native_stopVoiceEngine();
+        mOnRecordDataListener = null;
+    }
 
     public interface OnCommandListener { void onCommand(int domain, int command, String payload); }
     public void setCommandListener(OnCommandListener listener) { mOnCommandListener = listener; }
@@ -449,6 +470,9 @@ public class TmallGenie {
     public interface OnMemberQrCodeListener { void onMemberQrCode(String qrcode); }
     public void setMemberQrCodeListener(OnMemberQrCodeListener listener) { mOnMemberQrCodeListener = listener; }
     private OnMemberQrCodeListener mOnMemberQrCodeListener = null;
+
+    public interface OnRecordDataListener { void onRecordData(byte[] buffer, int size); }
+    private OnRecordDataListener mOnRecordDataListener = null;
 
     /**
      * A native method that is implemented by the 'native-lib' native library,
@@ -472,11 +496,9 @@ public class TmallGenie {
     public native void native_onQueryUserInfo();
     public native void native_onTextRecognize(String inputText) throws IllegalArgumentException;
 
-    public native boolean native_enableKeywordDetect();
-    public native void native_disableKeywordDetect();
+    private native boolean native_startVoiceEngine(int sampleRate, int ChannelCount, int bitsPerSample);
+    private native void native_stopVoiceEngine();
 
     // Used to load the 'native-lib' library on application startup.
-    static {
-        System.loadLibrary("tmallgenie-jni");
-    }
+    static { System.loadLibrary("tmallgenie-jni"); }
 }

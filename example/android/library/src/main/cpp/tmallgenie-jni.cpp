@@ -35,6 +35,7 @@ public:
     jboolean    mSdkStarted;
     jmethodID   mOnGetVolume;
     jmethodID   mOnSetVolume;
+    jmethodID   mOnFeedVoiceEngine;
     jmethodID   mOnCommand;
     jmethodID   mOnStatus;
     jmethodID   mOnAsrResult;
@@ -98,6 +99,22 @@ bool TmallGenie_onSetVolume(int volume)
     if (attached)
         sJavaVM->DetachCurrentThread();
     return res == JNI_TRUE;
+}
+
+void TmallGenie_onFeedVoiceEngine(char *buffer, int size)
+{
+    OS_LOGV(TAG, "TmallGenie_onFeedVoiceEngine");
+    JNIEnv *env;
+    jboolean attached = JNI_FALSE;
+    if (!jniGetEnv(&env, &attached))
+        return;
+    jbyteArray byteArray = env->NewByteArray(size);
+    env->SetByteArrayRegion(byteArray, 0, size, reinterpret_cast<const jbyte *>(buffer));
+    env->CallStaticVoidMethod(sTmallGenieJni.mClass, sTmallGenieJni.mOnFeedVoiceEngine, sTmallGenieJni.mObject,
+                              byteArray, size);
+    env->DeleteLocalRef(byteArray);
+    if (attached)
+        sJavaVM->DetachCurrentThread();
 }
 
 static void TmallGenie_onCommand(Genie_Domain_t domain, Genie_Command_t command, const char *payload)
@@ -367,16 +384,16 @@ static void TmallGenie_onTextRecognize(JNIEnv *env, jobject thiz, jstring inputT
     }
 }
 
-static jboolean TmallGenie_enableKeywordDetect(JNIEnv *env, jobject thiz)
+static jboolean TmallGenie_startVoiceEngine(JNIEnv *env, jobject thiz, jint sampleRate, jint ChannelCount, jint bitsPerSample)
 {
-    OS_LOGI(TAG, "TmallGenie_enableKeywordDetect");
-    return GnVendor_enableKeywordDetect();
+    OS_LOGI(TAG, "TmallGenie_startVoiceEngine");
+    return GnVendor_startVoiceEngine(sampleRate, ChannelCount, bitsPerSample);
 }
 
-static void TmallGenie_disableKeywordDetect(JNIEnv *env, jobject thiz)
+static void TmallGenie_stopVoiceEngine(JNIEnv *env, jobject thiz)
 {
-    OS_LOGI(TAG, "TmallGenie_disableKeywordDetect");
-    GnVendor_disableKeywordDetect();
+    OS_LOGI(TAG, "TmallGenie_stopVoiceEngine");
+    GnVendor_stopVoiceEngine();
 }
 
 static JNINativeMethod gMethods[] = {
@@ -396,8 +413,8 @@ static JNINativeMethod gMethods[] = {
         {"native_onSpeakerMutedChanged", "(Z)V", (void *)TmallGenie_onSpeakerMutedChanged},
         {"native_onQueryUserInfo", "()V", (void *)TmallGenie_onQueryUserInfo},
         {"native_onTextRecognize", "(Ljava/lang/String;)V", (void *)TmallGenie_onTextRecognize},
-        {"native_enableKeywordDetect", "()Z", (void *)TmallGenie_enableKeywordDetect},
-        {"native_disableKeywordDetect", "()V", (void *)TmallGenie_disableKeywordDetect},
+        {"native_startVoiceEngine", "(III)Z", (void *)TmallGenie_startVoiceEngine},
+        {"native_stopVoiceEngine", "()V", (void *)TmallGenie_stopVoiceEngine},
 };
 
 static int registerNativeMethods(JNIEnv *env, const char *className,JNINativeMethod *getMethods, int methodsNum)
@@ -420,6 +437,11 @@ static int registerNativeMethods(JNIEnv *env, const char *className,JNINativeMet
     sTmallGenieJni.mOnSetVolume = env->GetStaticMethodID(clazz, "onSetVolumeFromNative", "(Ljava/lang/Object;I)Z");
     if (sTmallGenieJni.mOnSetVolume == nullptr) {
         OS_LOGE(TAG, "Failed to get onSetVolumeFromNative mothod");
+        return JNI_FALSE;
+    }
+    sTmallGenieJni.mOnFeedVoiceEngine = env->GetStaticMethodID(clazz, "onFeedVoiceEngineFromNative", "(Ljava/lang/Object;[BI)V");
+    if (sTmallGenieJni.mOnFeedVoiceEngine == nullptr) {
+        OS_LOGE(TAG, "Failed to get onFeedVoiceEngineFromNative mothod");
         return JNI_FALSE;
     }
     sTmallGenieJni.mOnCommand = env->GetStaticMethodID(clazz, "onCommandFromNative", "(Ljava/lang/Object;IILjava/lang/String;)V");

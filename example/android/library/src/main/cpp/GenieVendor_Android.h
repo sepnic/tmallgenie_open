@@ -20,14 +20,15 @@
 // jni callback
 int  TmallGenie_onGetVolume();
 bool TmallGenie_onSetVolume(int volume);
+void TmallGenie_onFeedVoiceEngine(char *buffer, int size);
 
 // vendor init
 bool GnVendor_init(const char *wifiMac,
                    const char *bizType = nullptr, const char *bizGroup = nullptr,
                    const char *bizSecret = nullptr, const char *caCert = nullptr,
                    const char *uuid = nullptr, const char *accessToken = nullptr);
-bool GnVendor_enableKeywordDetect();
-void GnVendor_disableKeywordDetect();
+bool GnVendor_startVoiceEngine(int sampleRate, int ChannelCount, int bitsPerSample);
+void GnVendor_stopVoiceEngine();
 
 // system & account info
 const char *GnVendor_bizType();

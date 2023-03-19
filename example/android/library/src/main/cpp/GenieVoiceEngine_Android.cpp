@@ -115,7 +115,7 @@ public:
         ringbuf(nullptr),
         isStarted(false),
         isRecording(false),
-        enableKeywordDetect(false),
+        enableVoiceEngine(false),
         needStop(false)
     {}
 
@@ -153,7 +153,7 @@ public:
     std::condition_variable bufferCanRead;
     bool isStarted;
     bool isRecording;
-    bool enableKeywordDetect;
+    bool enableVoiceEngine;
     bool needStop;
 };
 
@@ -212,15 +212,11 @@ static void GnVendor_recorderBufferQueueCallback(SLAndroidSimpleBufferQueueItf b
             // notify reading-thread that the list has available buffer
             lk.unlock();
             in->bufferCanRead.notify_one();
-        } else if (in->enableKeywordDetect) {
-            // TODO: keyword detect
-            //if (sSdkCallback == nullptr)
-            //    GenieSdk_Get_Callback(&sSdkCallback);
-            //if (sSdkCallback != NULL)
-            //    sSdkCallback->onMicphoneWakeup("tian mao jing ling", 0, 0.600998834);
-        } else {
-            OS_LOGW(TAG, "Warning no handler for record data, it should not happen");
         }
+
+        if (in->enableVoiceEngine)
+            TmallGenie_onFeedVoiceEngine(in->enqueueBuffer, in->enqueueSize);
+
         SLresult result = (*in->recorderBufferQueue)->Enqueue(in->recorderBufferQueue, in->enqueueBuffer, in->enqueueSize);
         if (SL_RESULT_SUCCESS != result)
             OS_LOGE(TAG, "Failed to enqueue buffer to recorderBufferQueue");
@@ -580,7 +576,7 @@ void GnVendor_pcmInClose(void *handle)
         return;
     }
 
-    if (sVoiceEngineInst->enableKeywordDetect) {
+    if (sVoiceEngineInst->enableVoiceEngine) {
         OS_LOGD(TAG, "Keyword-detect enabled, don't actually close voice-engine instance");
         sVoiceEngineInst->isRecording = false;
         return;
@@ -590,33 +586,33 @@ void GnVendor_pcmInClose(void *handle)
     sVoiceEngineInst = nullptr;
 }
 
-bool GnVendor_enableKeywordDetect()
+bool GnVendor_startVoiceEngine(int sampleRate, int ChannelCount, int bitsPerSample)
 {
-    OS_LOGI(TAG, "GnVendor_enableKeywordDetect");
+    OS_LOGI(TAG, "GnVendor_enableVoiceEngine");
 
     std::lock_guard<std::mutex> lk(sVoiceEngineLock);
 
     if (sVoiceEngineInst == nullptr)
-        sVoiceEngineInst = (GnVendor_PcmIn *)GnVendor_pcmInOpenHw(VOICE_ENGINE_SAMPLE_RATE,
-                                                                  VOICE_ENGINE_CHANNEL_COUNT,
-                                                                  VOICE_ENGINE_SAMPLE_BIT);
-    if (sVoiceEngineInst == nullptr || (sVoiceEngineInst->sampleRate != VOICE_ENGINE_SAMPLE_RATE ||
-                                        sVoiceEngineInst->channelCount != VOICE_ENGINE_CHANNEL_COUNT ||
-                                        sVoiceEngineInst->bitsPerSample != VOICE_ENGINE_SAMPLE_BIT))
-        OS_LOGE(TAG, "Failed to GnVendor_enableKeywordDetect");
-    sVoiceEngineInst->enableKeywordDetect = true;
+        sVoiceEngineInst = (GnVendor_PcmIn *)GnVendor_pcmInOpenHw(sampleRate, ChannelCount, bitsPerSample);
+    if (sVoiceEngineInst == nullptr || (sVoiceEngineInst->sampleRate != sampleRate ||
+                                        sVoiceEngineInst->channelCount != ChannelCount ||
+                                        sVoiceEngineInst->bitsPerSample != bitsPerSample)) {
+        OS_LOGE(TAG, "Failed to GnVendor_enableVoiceEngine");
+        return false;
+    }
+    sVoiceEngineInst->enableVoiceEngine = true;
 
     return true;
 }
 
-void GnVendor_disableKeywordDetect()
+void GnVendor_stopVoiceEngine()
 {
-    OS_LOGI(TAG, "GnVendor_disableKeywordDetect");
+    OS_LOGI(TAG, "GnVendor_disableVoiceEngine");
 
     std::lock_guard<std::mutex> lk(sVoiceEngineLock);
 
     if (sVoiceEngineInst != nullptr) {
-        sVoiceEngineInst->enableKeywordDetect = false;
+        sVoiceEngineInst->enableVoiceEngine = false;
         if (sVoiceEngineInst->isRecording)
             return;
         GnVendor_pcmInCloseHW(sVoiceEngineInst);
