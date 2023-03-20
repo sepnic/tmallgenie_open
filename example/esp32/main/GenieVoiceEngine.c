@@ -99,7 +99,7 @@ bool GnVoiceEngine_init()
         ESP_LOGE(TAG, "rb_create failed");
         return false;
     }
-    if ((sGnVadHandle = litevad_create(GENIE_RECORD_SAMPLE_RATE, GENIE_RECORD_CHANNEL_COUNT)) == NULL) {
+    if ((sGnVadHandle = litevad_create(GENIE_RECORD_SAMPLE_RATE, GENIE_RECORD_CHANNEL_COUNT, GENIE_RECORD_SAMPLE_BIT)) == NULL) {
         ESP_LOGE(TAG, "litevad_create failed");
         return false;
     }

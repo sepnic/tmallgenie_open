@@ -427,7 +427,7 @@ static void *GnVendor_pcmInOpenHw(int sampleRate, int channelCount, int bitsPerS
         delete in;
         return nullptr;
     }
-    in->vadHandle = litevad_create(sampleRate, channelCount);
+    in->vadHandle = litevad_create(sampleRate, channelCount, bitsPerSample);
     if (in->vadHandle == nullptr) {
         OS_LOGE(TAG, "Failed to litevad_create");
         delete in;

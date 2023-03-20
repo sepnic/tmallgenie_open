@@ -15,8 +15,8 @@ endif()
 # cflags: OS_LINUX, OS_ANDROID, OS_APPLE, OS_RTOS
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -DOS_APPLE")
 
-set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -std=gnu99 -Wall -Werror")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror")
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -std=gnu99 -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 
 # include files
 include_directories(${TOP_DIR}/thirdparty/sysutils/include)
@@ -51,6 +51,7 @@ target_include_directories(mbedtls PRIVATE ${TOP_DIR}/thirdparty/mbedtls/include
 set(LITEPLAYER_ADAPTER_SRC
     ${TOP_DIR}/adapter/source_httpclient_wrapper.c
     ${TOP_DIR}/adapter/source_file_wrapper.c
+    ${TOP_DIR}/adapter/source_static_wrapper.c
     ${TOP_DIR}/adapter/sink_wave_wrapper.c
 )
 if(HAVE_LINUX_ALSA_ENABLED)
@@ -68,7 +69,6 @@ elseif(HAVE_PORT_AUDIO_ENABLED)
     else()
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_LITTLE_ENDIAN")
     endif()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=deprecated-declarations")
     set(PORTAUDIO_SRC
         ${PORTAUDIO_DIR}/src/common/pa_allocation.c
         ${PORTAUDIO_DIR}/src/common/pa_converters.c
@@ -111,6 +111,10 @@ add_library(liteplayer_adapter STATIC ${LITEPLAYER_ADAPTER_SRC})
 add_executable(basic_demo basic_demo.c)
 target_link_libraries(basic_demo liteplayer_core liteplayer_adapter sysutils mbedtls pthread m)
 
+# static_demo
+add_executable(static_demo static_demo.c)
+target_link_libraries(static_demo liteplayer_core liteplayer_adapter sysutils mbedtls pthread m)
+
 # playlist_demo
 add_executable(playlist_demo playlist_demo.c)
 target_link_libraries(playlist_demo liteplayer_core liteplayer_adapter sysutils mbedtls pthread m)
@@ -121,6 +125,7 @@ target_link_libraries(tts_demo liteplayer_core liteplayer_adapter sysutils mbedt
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     target_link_libraries(basic_demo asound)
+    target_link_libraries(static_demo asound)
     target_link_libraries(playlist_demo asound)
     target_link_libraries(tts_demo asound)
 endif()

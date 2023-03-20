@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2022 Qinglong<sysu.zqlong@gmail.com>
+ * Copyright (C) 2018-2023 Qinglong<sysu.zqlong@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,7 +122,7 @@ static bool valid_frame_size(int rate_idx, int frame_size)
     return false;
 }
 
-litevad_handle_t litevad_create(int sample_rate, int channel_count)
+litevad_handle_t litevad_create(int sample_rate, int channel_count, int sample_bits)
 {
     if (!valid_vad_mode(DEFAULT_VAD_MODE)) {
         pr_err("Invalid vad mode, valid value: 0/1/2/3");
@@ -138,6 +138,11 @@ litevad_handle_t litevad_create(int sample_rate, int channel_count)
     if (channel_count != 1) {
         // todo: support stereo2mono
         pr_err("Invalid channel count, valid value: 1");
+        return NULL;
+    }
+
+    if (sample_bits != 16) {
+        pr_err("Invalid sample bits, valid value: 16");
         return NULL;
     }
 
@@ -207,8 +212,8 @@ static int litevad_process_frame(litevad_handle_t handle, const short *frame_buf
         ret = LITEVAD_RESULT_ERROR;
     }
 
-    pr_dbg("Process: ret=%d, active_time=%d(ms), silence_time=%d(ms), speech_weight=%d",
-                        ret, priv->active_time, priv->silence_time, priv->speech_weight);
+    //pr_dbg("Process: ret=%d, active_time=%d(ms), silence_time=%d(ms), speech_weight=%d",
+    //                    ret, priv->active_time, priv->silence_time, priv->speech_weight);
     return ret;
 }
 

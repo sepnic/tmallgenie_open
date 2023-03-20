@@ -243,7 +243,7 @@ bool GnVoiceEngine_init()
         OS_LOGE(TAG, "rb_create failed");
         return false;
     }
-    sGnVadHandle = litevad_create(GENIE_RECORD_SAMPLE_RATE, GENIE_RECORD_CHANNEL_COUNT);
+    sGnVadHandle = litevad_create(GENIE_RECORD_SAMPLE_RATE, GENIE_RECORD_CHANNEL_COUNT, GENIE_RECORD_SAMPLE_BIT);
     if (sGnVadHandle == NULL) {
         OS_LOGE(TAG, "litevad_create failed");
         return false;

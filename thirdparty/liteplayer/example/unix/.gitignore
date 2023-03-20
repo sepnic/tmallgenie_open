@@ -1,5 +1,6 @@
 /Makefile
 /basic_demo
+/static_demo
 /playlist_demo
 /tts_demo
 /*.a
