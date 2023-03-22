@@ -7,13 +7,14 @@
 **演示视频：**
  - [MacOSX 精灵语音助手](https://www.bilibili.com/video/BV1Na411q7o8)
  - [ESP32 精灵智能音箱](https://www.bilibili.com/video/BV1q34y1C7CA)
- - Android 精灵语音助手截图
+ - Android 精灵语音助手截图：点击 Record 开始录音，过程中会自动判断说话完毕并结束录音，如果环境嘈杂不能自动判断，也可以再次点击 Record 手动结束录音；点击 KeywordDetect 启动语音唤醒功能，默认关键词是 "Jarvis"，再次点击 KeywordDetect 停止语音唤醒功能
 
 ![GenieAndroidDemo](https://github.com/sepnic/tmallgenie_open/blob/master/GenieAndroidDemo.png)
 
 **编译运行：**
 - MacOSX/Ubuntu/raspberry-pi：[How to build tmallgenie for macosx/ubuntu/raspberry-pi](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/README.md)
 - ESP32：[How to build tmallgenie for esp32](https://github.com/sepnic/tmallgenie_open/blob/master/example/esp32/README.md)
+- Android：Android Studio 打开 [example/Android](https://github.com/sepnic/tmallgenie_open/tree/master/example/android)，编译运行，需要 JDK 11
 
 ## 精灵整体框架图
 ![GenieArchitecture](https://github.com/sepnic/tmallgenie_open/blob/master/GenieArchitecture.png)
@@ -76,15 +77,17 @@ player 包含两部分，分别是播控系统（UTPManager）和播放器（Lit
 - 播放器：目前使用的是本人实现的 Liteplayer，也可以使用其他播放器接入到播控系统
 
 ## 依赖的第三方库
-- [sysutils](https://github.com/sepnic/sysutils)：系统基本组件，包括 osal/looper/ringbuf/cipher/json/httpclient。作者：本人(Qinglong)，许可：Apache-2.0
-- [mbedtls](https://github.com/Mbed-TLS/mbedtls/tree/mbedtls-2.16)：通讯加密。作者：MbedTLS，许可：Apache-2.0
-- [nopoll](https://github.com/ASPLes/nopoll)：websocket 协议通讯。作者：ASPLes，许可：LGPL-2.1
-- [speex](https://github.com/xiph/speex) & [ogg](https://github.com/xiph/ogg)：语音压缩和编码。作者：xiph，许可：FreeBSD
-- [pvmp3](http://androidxref.com/4.4_r1/xref/frameworks/av/media/libstagefright/codecs/mp3dec/src/) & [pvaac](http://androidxref.com/2.2.3/xref/frameworks/base/media/libstagefright/codecs/aacdec/)：mp3 & aac 音频解码库。作者：PacketVideo，许可：Apache-2.0
-- [liteplayer](https://github.com/sepnic/liteplayer_open)：音频播放器。作者：本人(Qinglong)，许可：Apache-2.0
-- [litevad](https://github.com/sepnic/litevad)：语句结束检测，依赖 webrtc VAD 模块。作者：本人(Qinglong)，许可：Apache-2.0
-- [snowboy](https://github.com/Kitt-AI/snowboy)：语音热词检测，即语音唤醒。作者：KITT.AI，许可：Apache-2.0
-- [portaudio](https://github.com/PortAudio/portaudio)：跨平台的音频 I/O 库。作者：PortAudio，许可：FreeBSD
+| Component | Author | License | Description |
+| ------ | ------- | -------- | ------------ |
+| [sysutils](https://github.com/sepnic/sysutils) | 本人(Qinglong) | Apache-2.0 | 系统基本组件，包括 osal/looper/ringbuf/cipher/json/httpclient |
+| [mbedtls](https://github.com/Mbed-TLS/mbedtls/tree/mbedtls-2.16) | MbedTLS | Apache-2.0 | 网络通讯加密 |
+| [nopoll](https://github.com/ASPLes/nopoll) | ASPLes | LGPL-2.1 | websocket 通讯协议轻量级实现 |
+| [speex](https://github.com/xiph/speex) | xiph | FreeBSD | 语音压缩和编码 |
+| [pvmp3](http://androidxref.com/4.4_r1/xref/frameworks/av/media/libstagefright/codecs/mp3dec/src/) & [pvaac](http://androidxref.com/2.2.3/xref/frameworks/base/media/libstagefright/codecs/aacdec/) | PacketVideo | Apache-2.0 | mp3 & aac 音频解码库 |
+| [liteplayer](https://github.com/sepnic/liteplayer_open) | 本人(Qinglong) | Apache-2.0 | 轻量级音频播放器 |
+| [litevad](https://github.com/sepnic/litevad) | 本人(Qinglong) | Apache-2.0 | 语句结束检测，依赖 webrtc VAD 模块 |
+| [snowboy](https://github.com/Kitt-AI/snowboy) | KITT.AI | Apache-2.0 | 语音热词检测，即语音唤醒 |
+| [portaudio](https://github.com/PortAudio/portaudio) | PortAudio | FreeBSD | 跨平台的音频 I/O 库 |
 
 ## 限制说明
 tmallgenie_open 仅用作个人研究学习，不能用于商业用途。本项目在部分平台上有两个限制：
