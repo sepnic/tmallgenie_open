@@ -3,3 +3,8 @@
 /*.umdl
 /*.a
 /GenieMain
+
+/mbedtls-2.16.12.tar.gz
+/pa_stable_v190700_20210406.tgz
+mbedtls/
+portaudio/

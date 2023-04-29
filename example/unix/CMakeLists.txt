@@ -11,7 +11,6 @@ endif()
 
 set(TOP_DIR             "${CMAKE_SOURCE_DIR}/../..")
 set(SYSUTILS_DIR        "${TOP_DIR}/thirdparty/sysutils")
-set(MBEDTLS_DIR         "${TOP_DIR}/thirdparty/mbedtls")
 set(LITEPLAYER_DIR      "${TOP_DIR}/thirdparty/liteplayer")
 set(LITEVAD_DIR         "${TOP_DIR}/thirdparty/litevad")
 set(SPEEX_DIR           "${TOP_DIR}/thirdparty/speex")
@@ -54,7 +53,6 @@ endif()
 # include files
 include_directories(${TOP_DIR}/include)
 include_directories(${SYSUTILS_DIR}/include)
-include_directories(${MBEDTLS_DIR}/include)
 include_directories(${LITEPLAYER_DIR}/include)
 include_directories(${LITEVAD_DIR}/include)
 include_directories(${SPEEX_DIR}/include)
@@ -96,10 +94,6 @@ set(SYSUTILS_SRC
 add_library(sysutils STATIC ${SYSUTILS_SRC})
 target_compile_options(sysutils PRIVATE -DSYSUTILS_HAVE_MBEDTLS_ENABLED)
 
-# mbedtls files
-file(GLOB MBEDTLS_SRC src ${MBEDTLS_DIR}/library/*.c)
-add_library(mbedtls STATIC ${MBEDTLS_SRC})
-
 # litevad files
 set(LITEVAD_SRC
     ${LITEVAD_DIR}/thirdparty/webrtc/src/signal_processing/energy.c
@@ -129,51 +123,24 @@ target_compile_options(speex PRIVATE
 
 # genie adapter
 if(ENABLE_GENIE_ADAPTER_PORTAUDIO)
-    # portaudio
-    set(PORTAUDIO_DIR "${TOP_DIR}/thirdparty/portaudio")
-    include_directories(${PORTAUDIO_DIR}/include)
-    include_directories(${PORTAUDIO_DIR}/src/common)
-    include_directories(${PORTAUDIO_DIR}/src/os/unix)
-    set(PORTAUDIO_SRC
-        ${PORTAUDIO_DIR}/src/common/pa_allocation.c
-        ${PORTAUDIO_DIR}/src/common/pa_converters.c
-        ${PORTAUDIO_DIR}/src/common/pa_cpuload.c
-        ${PORTAUDIO_DIR}/src/common/pa_debugprint.c
-        ${PORTAUDIO_DIR}/src/common/pa_dither.c
-        ${PORTAUDIO_DIR}/src/common/pa_front.c
-        ${PORTAUDIO_DIR}/src/common/pa_process.c
-        ${PORTAUDIO_DIR}/src/common/pa_ringbuffer.c
-        ${PORTAUDIO_DIR}/src/common/pa_stream.c
-        ${PORTAUDIO_DIR}/src/common/pa_trace.c
-        ${PORTAUDIO_DIR}/src/hostapi/skeleton/pa_hostapi_skeleton.c
-        ${PORTAUDIO_DIR}/src/os/unix/pa_unix_hostapis.c
-        ${PORTAUDIO_DIR}/src/os/unix/pa_unix_util.c)
+    execute_process(COMMAND ${CMAKE_SOURCE_DIR}/install_portaudio.sh
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    include_directories(${CMAKE_CURRENT_BINARY_DIR}/portaudio/install/include)
+    link_directories(${CMAKE_CURRENT_BINARY_DIR}/portaudio/install/lib)
+
     if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_USE_ALSA=1")
         set(PLATFORM_LIB "asound -lf77blas -lcblas -llapack_atlas -latlas")
-        set(PORTAUDIO_SRC ${PORTAUDIO_SRC} ${PORTAUDIO_DIR}/src/hostapi/alsa/pa_linux_alsa.c)
     elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_USE_COREAUDIO=1")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework Accelerate")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework CoreAudio")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework AudioToolbox")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework AudioUnit")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework CoreServices")
-        set(PORTAUDIO_SRC ${PORTAUDIO_SRC}
-            ${PORTAUDIO_DIR}/src/hostapi/coreaudio/pa_mac_core.c
-            ${PORTAUDIO_DIR}/src/hostapi/coreaudio/pa_mac_core_blocking.c
-            ${PORTAUDIO_DIR}/src/hostapi/coreaudio/pa_mac_core_utilities.c)
-    endif()
-    include(TestBigEndian)
-    TEST_BIG_ENDIAN(IS_BIG_ENDIAN)
-    if(IS_BIG_ENDIAN)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_BIG_ENDIAN")
-    else()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPA_LITTLE_ENDIAN")
     endif()
 
+    set(PLATFORM_LIB portaudio ${PLATFORM_LIB})
+
     set(TMALLGENIE_ADAPTER_SRC
-        ${PORTAUDIO_SRC}
         ${TOP_DIR}/adapter/portaudio/GenieVoiceEngine_PortAudio.c
         ${TOP_DIR}/adapter/portaudio/GenieVendor_PortAudio.c)
 else()
@@ -205,9 +172,17 @@ if(ENABLE_SNOWBOY_KEYWORD_DETECT)
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
+# mbedtls
+execute_process(COMMAND ${CMAKE_SOURCE_DIR}/install_mbedtls.sh
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/mbedtls/include)
+link_directories(${CMAKE_CURRENT_BINARY_DIR}/mbedtls/install/library)
+
 # GenieMain
 add_executable(GenieMain ${CMAKE_SOURCE_DIR}/GenieMain.c ${TMALLGENIE_ADAPTER_SRC})
 target_include_directories(GenieMain PRIVATE ${TOP_DIR}/adapter)
 target_link_libraries(GenieMain
-    tmallgenie_open tmallgenie_core liteplayer_core litevad speex sysutils mbedtls pthread
+    tmallgenie_open tmallgenie_core
+    liteplayer_core litevad speex sysutils
+    mbedtls mbedx509 mbedcrypto pthread
     ${PLATFORM_LIB})
