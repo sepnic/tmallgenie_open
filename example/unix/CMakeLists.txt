@@ -121,6 +121,21 @@ add_library(speex STATIC ${SPEEX_SRC})
 target_compile_options(speex PRIVATE
     -DFIXED_POINT -DUSE_KISS_FFT -DEXPORT= -DSPEEX_HAVE_SYSUTILS_ENABLED)
 
+# mbedtls
+if(1)
+    set(MBEDTLS_DIR "${TOP_DIR}/thirdparty/mbedtls")
+    include_directories(${MBEDTLS_DIR}/include)
+    file(GLOB MBEDTLS_SRC src ${MBEDTLS_DIR}/library/*.c)
+    add_library(mbedtls STATIC ${MBEDTLS_SRC})
+    set(MBEDTLS_LIBS "mbedtls")
+else()
+    execute_process(COMMAND ${CMAKE_SOURCE_DIR}/install_mbedtls.sh
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    include_directories(${CMAKE_CURRENT_BINARY_DIR}/mbedtls/include)
+    link_directories(${CMAKE_CURRENT_BINARY_DIR}/mbedtls/install/library)
+    set(MBEDTLS_LIBS "mbedtls mbedx509 mbedcrypto")
+endif()
+
 # genie adapter
 if(ENABLE_GENIE_ADAPTER_PORTAUDIO)
     execute_process(COMMAND ${CMAKE_SOURCE_DIR}/install_portaudio.sh
@@ -129,7 +144,7 @@ if(ENABLE_GENIE_ADAPTER_PORTAUDIO)
     link_directories(${CMAKE_CURRENT_BINARY_DIR}/portaudio/install/lib)
 
     if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-        set(PLATFORM_LIB "asound -lf77blas -lcblas -llapack_atlas -latlas")
+        set(PLATFORM_LIBS "asound -lf77blas -lcblas -llapack_atlas -latlas")
     elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework Accelerate")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework CoreAudio")
@@ -138,7 +153,7 @@ if(ENABLE_GENIE_ADAPTER_PORTAUDIO)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework CoreServices")
     endif()
 
-    set(PLATFORM_LIB portaudio ${PLATFORM_LIB})
+    set(PLATFORM_LIBS portaudio ${PLATFORM_LIBS})
 
     set(TMALLGENIE_ADAPTER_SRC
         ${TOP_DIR}/adapter/portaudio/GenieVoiceEngine_PortAudio.c
@@ -149,7 +164,7 @@ else()
         set(TMALLGENIE_ADAPTER_SRC
             ${TOP_DIR}/adapter/alsa/GenieVoiceEngine_Alsa.c
             ${TOP_DIR}/adapter/alsa/GenieVendor_Alsa.c)
-        set(PLATFORM_LIB "asound -lf77blas -lcblas -llapack_atlas -latlas")
+        set(PLATFORM_LIBS "asound -lf77blas -lcblas -llapack_atlas -latlas")
     else()
         message(FATAL_ERROR "None genie adapter, abort....")
         return()
@@ -162,7 +177,7 @@ if(ENABLE_SNOWBOY_KEYWORD_DETECT)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=0")
     set(TMALLGENIE_ADAPTER_SRC ${TMALLGENIE_ADAPTER_SRC}
         ${SNOWBOY_DIR}/wrapper/snowboy-detect-c-wrapper.cc)
-    set(PLATFORM_LIB snowboy-detect ${PLATFORM_LIB})
+    set(PLATFORM_LIBS snowboy-detect ${PLATFORM_LIBS})
     file(COPY
         ${SNOWBOY_DIR}/resources/common.res
         ${SNOWBOY_DIR}/resources/models/snowboy.umdl
@@ -172,17 +187,10 @@ if(ENABLE_SNOWBOY_KEYWORD_DETECT)
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
-# mbedtls
-execute_process(COMMAND ${CMAKE_SOURCE_DIR}/install_mbedtls.sh
-                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/mbedtls/include)
-link_directories(${CMAKE_CURRENT_BINARY_DIR}/mbedtls/install/library)
-
 # GenieMain
 add_executable(GenieMain ${CMAKE_SOURCE_DIR}/GenieMain.c ${TMALLGENIE_ADAPTER_SRC})
 target_include_directories(GenieMain PRIVATE ${TOP_DIR}/adapter)
 target_link_libraries(GenieMain
     tmallgenie_open tmallgenie_core
-    liteplayer_core litevad speex sysutils
-    mbedtls mbedx509 mbedcrypto pthread
-    ${PLATFORM_LIB})
+    liteplayer_core litevad speex sysutils pthread
+    ${MBEDTLS_LIBS} ${PLATFORM_LIBS})
