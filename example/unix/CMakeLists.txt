@@ -11,6 +11,7 @@ endif()
 
 set(TOP_DIR             "${CMAKE_SOURCE_DIR}/../..")
 set(SYSUTILS_DIR        "${TOP_DIR}/thirdparty/sysutils")
+set(NOPOLL_DIR          "${TOP_DIR}/thirdparty/nopoll")
 set(LITEPLAYER_DIR      "${TOP_DIR}/thirdparty/liteplayer")
 set(LITEVAD_DIR         "${TOP_DIR}/thirdparty/litevad")
 set(SPEEX_DIR           "${TOP_DIR}/thirdparty/speex")
@@ -53,6 +54,7 @@ endif()
 # include files
 include_directories(${TOP_DIR}/include)
 include_directories(${SYSUTILS_DIR}/include)
+include_directories(${NOPOLL_DIR}/src)
 include_directories(${LITEPLAYER_DIR}/include)
 include_directories(${LITEVAD_DIR}/include)
 include_directories(${SPEEX_DIR}/include)
@@ -93,6 +95,23 @@ set(SYSUTILS_SRC
     ${SYSUTILS_DIR}/source/json/cJSON_Utils.c)
 add_library(sysutils STATIC ${SYSUTILS_SRC})
 target_compile_options(sysutils PRIVATE -DSYSUTILS_HAVE_MBEDTLS_ENABLED)
+
+# nopoll files
+set(NOPOLL_SRC
+    ${NOPOLL_DIR}/src/nopoll.c
+    ${NOPOLL_DIR}/src/nopoll_conn_opts.c
+    ${NOPOLL_DIR}/src/nopoll_decl.c
+    ${NOPOLL_DIR}/src/nopoll_listener.c
+    ${NOPOLL_DIR}/src/nopoll_loop.c
+    ${NOPOLL_DIR}/src/nopoll_conn.c
+    ${NOPOLL_DIR}/src/nopoll_ctx.c
+    ${NOPOLL_DIR}/src/nopoll_io.c
+    ${NOPOLL_DIR}/src/nopoll_log.c
+    ${NOPOLL_DIR}/src/nopoll_msg.c
+    ${TOP_DIR}/src/base/websocket_client.c)
+add_library(nopoll STATIC ${NOPOLL_SRC})
+target_compile_options(nopoll PRIVATE
+    -DNOPOLL_HAVE_SYSUTILS_ENABLED -DNOPOLL_HAVE_MBEDTLS_ENABLED)
 
 # litevad files
 set(LITEVAD_SRC
@@ -192,5 +211,5 @@ add_executable(GenieMain ${CMAKE_SOURCE_DIR}/GenieMain.c ${TMALLGENIE_ADAPTER_SR
 target_include_directories(GenieMain PRIVATE ${TOP_DIR}/adapter)
 target_link_libraries(GenieMain
     tmallgenie_open tmallgenie_core
-    liteplayer_core litevad speex sysutils pthread
+    liteplayer_core nopoll litevad speex sysutils pthread
     ${MBEDTLS_LIBS} ${PLATFORM_LIBS})
