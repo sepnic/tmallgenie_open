@@ -2,7 +2,7 @@
 
 echo "Installing mbedtls"
 
-MBEDTLS_VER=2.16.12
+MBEDTLS_VER=2.28.3
 
 if [ ! -e mbedtls-$MBEDTLS_VER.tar.gz ]; then
   wget -T 10 -t 3 \

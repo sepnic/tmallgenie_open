@@ -152,7 +152,7 @@ else()
                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     include_directories(${CMAKE_CURRENT_BINARY_DIR}/mbedtls/include)
     link_directories(${CMAKE_CURRENT_BINARY_DIR}/mbedtls/install/library)
-    set(MBEDTLS_LIBS "mbedtls mbedx509 mbedcrypto")
+    set(MBEDTLS_LIBS "mbedtls -lmbedx509 -lmbedcrypto")
 endif()
 
 # genie adapter
