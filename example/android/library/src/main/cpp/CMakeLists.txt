@@ -5,6 +5,7 @@ option(ENABLE_LITEVAD_SPEECH_DETECT  "Enable litevad speech detect"  "ON")
 
 set(TOP_DIR             "${CMAKE_SOURCE_DIR}/../../../../../..")
 set(SYSUTILS_DIR        "${TOP_DIR}/thirdparty/sysutils")
+set(NOPOLL_DIR          "${TOP_DIR}/thirdparty/nopoll")
 set(MBEDTLS_DIR         "${TOP_DIR}/thirdparty/mbedtls")
 set(LITEPLAYER_DIR      "${TOP_DIR}/thirdparty/liteplayer")
 set(SPEEX_DIR           "${TOP_DIR}/thirdparty/speex")
@@ -18,6 +19,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror")
 include_directories(${TMALLGENIE_DIR}/include)
 include_directories(${SYSUTILS_DIR}/include)
 include_directories(${MBEDTLS_DIR}/include)
+include_directories(${NOPOLL_DIR}/src)
 include_directories(${LITEPLAYER_DIR}/include)
 include_directories(${SPEEX_DIR}/include)
 
@@ -58,6 +60,23 @@ set(SYSUTILS_SRC
 add_library(sysutils STATIC ${SYSUTILS_SRC})
 target_compile_options(sysutils PRIVATE -DOS_ANDROID -DSYSUTILS_HAVE_MBEDTLS_ENABLED)
 
+# nopoll files
+set(NOPOLL_SRC
+    ${NOPOLL_DIR}/src/nopoll.c
+    ${NOPOLL_DIR}/src/nopoll_conn_opts.c
+    ${NOPOLL_DIR}/src/nopoll_decl.c
+    ${NOPOLL_DIR}/src/nopoll_listener.c
+    ${NOPOLL_DIR}/src/nopoll_loop.c
+    ${NOPOLL_DIR}/src/nopoll_conn.c
+    ${NOPOLL_DIR}/src/nopoll_ctx.c
+    ${NOPOLL_DIR}/src/nopoll_io.c
+    ${NOPOLL_DIR}/src/nopoll_log.c
+    ${NOPOLL_DIR}/src/nopoll_msg.c
+    ${TMALLGENIE_DIR}/src/base/websocket_client.c)
+add_library(nopoll STATIC ${NOPOLL_SRC})
+target_compile_options(nopoll PRIVATE
+    -DNOPOLL_HAVE_SYSUTILS_ENABLED -DNOPOLL_HAVE_MBEDTLS_ENABLED)
+
 # speex files
 file(GLOB SPEEX_SRC src ${SPEEX_DIR}/libspeex/*.c ${SPEEX_DIR}/libogg/*.c)
 add_library(speex STATIC ${SPEEX_SRC})
@@ -80,7 +99,7 @@ set(JNI_SRC
     lockfree_ringbuf.c)
 add_library(tmallgenie-jni SHARED ${JNI_SRC})
 target_link_libraries(tmallgenie-jni
-    tmallgenie_open tmallgenie_core liteplayer_core speex sysutils mbedtls
+    tmallgenie_open tmallgenie_core liteplayer_core nopoll speex sysutils mbedtls
     OpenSLES android log)
 
 if(ENABLE_LITEVAD_SPEECH_DETECT)
