@@ -433,7 +433,6 @@ Makefile
 src/Makefile
 doc/Makefile
 doc/nopoll.doxygen
-test/Makefile
 nopoll.pc])
 
 sed -i "s/__NOPOLL_VERSION__/$NOPOLL_VERSION/g" doc/nopoll.doxygen

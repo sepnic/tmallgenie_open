@@ -16,7 +16,7 @@
  *  License along with this program; if not, write to the Free
  *  Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
- *  
+ *
  *  You may find a copy of the license under this software is released
  *  at COPYING file. This is LGPL software: you are welcome to develop
  *  proprietary applications using this library without any royalty or
@@ -25,7 +25,7 @@
  *
  *  For commercial support on build Websocket enabled solutions
  *  contact us:
- *          
+ *
  *      Postal address:
  *         Advanced Software Production Line, S.L.
  *         Av. Juan Carlos I, Nº13, 2ºC
@@ -35,19 +35,28 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
-#include <nopoll_conn_opts.h>
-#include <nopoll_private.h>
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
+#include "nopoll_conn_opts.h"
+#include "nopoll_private.h"
 
-/** 
+/**
  * \defgroup nopoll_conn_opts noPoll Connection Options: API to change default connection options.
  */
 
-/** 
+/**
  * \addtogroup nopoll_conn_opts
  * @{
  */
 
-/** 
+/**
  * @brief Create a new connection options object.
  *
  * @return A newly created connection options object. In general you don't have to worry about releasing this object because this is automatically done by functions using this object. However, if you call to \ref nopoll_conn_opts_set_reuse (opts, nopoll_true), then you'll have to use \ref nopoll_conn_opts_free to release the object after it is no longer used. The function may return NULL in case of memory allocation problems. Creating an object without setting anything will cause the library to provide same default behaviour as not providing it.
@@ -62,6 +71,7 @@ noPollConnOpts * nopoll_conn_opts_new (void)
 		return NULL;
 
 	result->reuse        = nopoll_false; /* this is not needed, just to clearly state defaults */
+#if !defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
 #if defined(NOPOLL_HAVE_TLS_FLEXIBLE_ENABLED)
 	result->ssl_protocol = NOPOLL_METHOD_TLS_FLEXIBLE;
 #elif defined(NOPOLL_HAVE_TLSv12_ENABLED)
@@ -70,7 +80,8 @@ noPollConnOpts * nopoll_conn_opts_new (void)
 	result->ssl_protocol = NOPOLL_METHOD_TLSV1_1;
 #elif defined(NOPOLL_HAVE_TLSv10_ENABLED)
 	result->ssl_protocol = NOPOLL_METHOD_TLSV1;
-#endif	  
+#endif
+#endif
 
 	result->mutex        = nopoll_mutex_create ();
 	result->refs         = 1;
@@ -83,11 +94,12 @@ noPollConnOpts * nopoll_conn_opts_new (void)
 	return result;
 }
 
-/** 
+#if !defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
+/**
  * @brief Set ssl protocol method to be used on the API receiving this
  * configuration object.
  *
- * @param opts The connection options object. 
+ * @param opts The connection options object.
  *
  * @param ssl_protocol SSL protocol to use. See \ref noPollSslProtocol for more information.
  */
@@ -98,9 +110,9 @@ void nopoll_conn_opts_set_ssl_protocol (noPollConnOpts * opts, noPollSslProtocol
 	opts->ssl_protocol = ssl_protocol;
 	return;
 }
+#endif
 
-
-/** 
+/**
  * @brief Allows to certificate, private key and optional chain
  * certificate and ca for on a particular options that can be used for
  * a client and a listener connection.
@@ -112,7 +124,7 @@ void nopoll_conn_opts_set_ssl_protocol (noPollConnOpts * opts, noPollSslProtocol
  *
  * @param private_key client_certificate private key.
  *
- * @param chain_certificate Optional chain certificate to use 
+ * @param chain_certificate Optional chain certificate to use
  *
  * @param ca_certificate Optional CA certificate to use during the
  * process.
@@ -120,37 +132,102 @@ void nopoll_conn_opts_set_ssl_protocol (noPollConnOpts * opts, noPollSslProtocol
  * @return nopoll_true in the case all certificate files provided are
  * reachable.
  */
-nopoll_bool        nopoll_conn_opts_set_ssl_certs    (noPollConnOpts * opts, 
+#if defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
+nopoll_bool        nopoll_conn_opts_set_ssl_certs    (noPollConnOpts * opts,
+						      const char     * certificate,
+						      int              certificate_size,
+						      const char     * private_key,
+						      int              private_key_size,
+						      const char     * chain_certificate,
+						      int              chain_certificate_size,
+						      const char     * ca_certificate,
+						      int              ca_certificate_size)
+#else
+nopoll_bool        nopoll_conn_opts_set_ssl_certs    (noPollConnOpts * opts,
 						      const char     * certificate,
 						      const char     * private_key,
 						      const char     * chain_certificate,
 						      const char     * ca_certificate)
+#endif
 {
 	if (opts == NULL)
 		return nopoll_false;
-	
+#if defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
+	if (certificate)
+		opts->certificate = nopoll_new(char, certificate_size);
+	if (private_key)
+		opts->private_key = nopoll_new(char, private_key_size);
+	if (chain_certificate)
+		opts->chain_certificate = nopoll_new(char, chain_certificate_size);
+	if (ca_certificate)
+		opts->ca_certificate = nopoll_new(char, ca_certificate_size);
+
+	if ((certificate && (opts->certificate == NULL)) ||
+	    (private_key && (opts->private_key == NULL)) ||
+	    (chain_certificate && (opts->chain_certificate == NULL)) ||
+	    (ca_certificate && (opts->ca_certificate == NULL))) {
+		if (opts->certificate) {
+			nopoll_free(opts->certificate);
+			opts->certificate = NULL;
+		}
+		if (opts->private_key) {
+			nopoll_free(opts->private_key);
+			opts->private_key = NULL;
+		}
+		if (opts->chain_certificate) {
+			nopoll_free(opts->chain_certificate);
+			opts->chain_certificate = NULL;
+		}
+		if (opts->ca_certificate) {
+			nopoll_free(opts->ca_certificate);
+			opts->ca_certificate = NULL;
+		}
+		return nopoll_false;
+	}
+
+	if (certificate) {
+		memcpy(opts->certificate, certificate, certificate_size);
+		opts->certificate_size = certificate_size;
+	}
+	if (private_key) {
+		memcpy(opts->private_key, private_key, private_key_size);
+		opts->private_key_size = private_key_size;
+	}
+	if (chain_certificate) {
+		memcpy(opts->chain_certificate, chain_certificate, chain_certificate_size);
+		opts->chain_certificate_size = chain_certificate_size;
+	}
+	if (ca_certificate) {
+		memcpy(opts->ca_certificate, ca_certificate, ca_certificate_size);
+		opts->ca_certificate_size = ca_certificate_size;
+	}
+#else
 	/* store certificate settings */
 	opts->certificate        = nopoll_strdup (certificate);
 	if (opts->certificate)
 		if (access (opts->certificate, R_OK) != 0)
 			return nopoll_false;
+
 	opts->private_key        = nopoll_strdup (private_key);
 	if (opts->private_key)
 		if (access (opts->private_key, R_OK) != 0)
 			return nopoll_false;
+
 	opts->chain_certificate  = nopoll_strdup (chain_certificate);
 	if (opts->chain_certificate)
 		if (access (opts->chain_certificate, R_OK) != 0)
 			return nopoll_false;
+
 	opts->ca_certificate     = nopoll_strdup (ca_certificate);
 	if (opts->ca_certificate)
 		if (access (opts->ca_certificate, R_OK) != 0)
 			return nopoll_false;
-
+#endif // defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
 	return nopoll_true;
 }
 
-/** 
+
+/**
  * @brief Allows to disable peer ssl certificate verification. This is
  * not recommended for production enviroment. This affects in a
  * different manner to a listener connection and a client connection.
@@ -178,7 +255,8 @@ void nopoll_conn_opts_ssl_peer_verify (noPollConnOpts * opts, nopoll_bool verify
 	return;
 }
 
-/** 
+
+/**
  * @brief Allows to set Cookie header content to be sent during the
  * connection handshake. If configured and the remote side server is a
  * noPoll peer, use \ref nopoll_conn_get_cookie to get this value.
@@ -204,7 +282,7 @@ void        nopoll_conn_opts_set_cookie (noPollConnOpts * opts, const char * coo
 	return;
 }
 
-/** 
+/**
  * @brief Allows to set arbitrary HTTP headers and content to be sent during
  * the connection handshake.
  *
@@ -233,7 +311,7 @@ void        nopoll_conn_opts_set_extra_headers (noPollConnOpts * opts, const cha
 }
 
 
-/** 
+/**
  * @brief Allows to skip origin check for an incoming connection.
  *
  * This option is highly not recommended because the Origin header
@@ -246,13 +324,13 @@ void        nopoll_conn_opts_set_extra_headers (noPollConnOpts * opts, const cha
  *
  * @param opts The connection options to configure.
  *
- * @param skip_check nopoll_bool Skip header check 
+ * @param skip_check nopoll_bool Skip header check
  *
  */
 void        nopoll_conn_opts_skip_origin_check (noPollConnOpts * opts, nopoll_bool skip_check)
 {
 	/* configure skip origin header check */
-	if (opts) 
+	if (opts)
 		opts->skip_origin_header_check = skip_check;
 
 	return;
@@ -286,15 +364,14 @@ void        nopoll_conn_opts_skip_origin_check (noPollConnOpts * opts, nopoll_bo
 void        nopoll_conn_opts_add_origin_header (noPollConnOpts * opts, nopoll_bool add)
 {
 	/* configure add origin header */
-	if (opts) 
+	if (opts)
 		opts->add_origin_header = add;
 	return;
 }
 
-
-/** 
+/**
  * @brief Allows to increase a reference to the connection options
- * provided. 
+ * provided.
  *
  * @param opts The connection option reference over which a connection
  * reference is needed.
@@ -314,7 +391,7 @@ nopoll_bool nopoll_conn_opts_ref (noPollConnOpts * opts)
 		nopoll_mutex_unlock (opts->mutex);
 		return nopoll_false;
 	}
-	
+
 	opts->refs++;
 
 	/* release here the mutex */
@@ -323,7 +400,7 @@ nopoll_bool nopoll_conn_opts_ref (noPollConnOpts * opts)
 	return nopoll_true;
 }
 
-/** 
+/**
  * @brief Allows to unref a reference acquired by \ref nopoll_conn_opts_ref
  *
  * @param opts The connection opts to release.
@@ -336,7 +413,7 @@ void        nopoll_conn_opts_unref (noPollConnOpts * opts)
 }
 
 
-/** 
+/**
  * @brief Set reuse-flag be used on the API receiving this
  * configuration object. By setting nopoll_true will cause the API to
  * not release the object when finished. Instead, the caller will be
@@ -344,7 +421,7 @@ void        nopoll_conn_opts_unref (noPollConnOpts * opts)
  * finishing, a call to \ref nopoll_conn_opts_set_reuse function is
  * required.
  *
- * @param opts The connection options object. 
+ * @param opts The connection options object.
  *
  * @param reuse nopoll_true to reuse the object across calls,
  * otherwise nopoll_false to make the API function to release the
@@ -404,6 +481,12 @@ void __nopoll_conn_opts_free_common  (noPollConnOpts * opts)
 	nopoll_free (opts->private_key);
 	nopoll_free (opts->chain_certificate);
 	nopoll_free (opts->ca_certificate);
+#if defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
+	opts->certificate_size = 0;
+	opts->private_key_size = 0;
+	opts->chain_certificate_size = 0;
+	opts->ca_certificate_size = 0;
+#endif
 
 	/* cookie */
 	nopoll_free (opts->cookie);
@@ -420,7 +503,7 @@ void __nopoll_conn_opts_free_common  (noPollConnOpts * opts)
 	return;
 }
 
-/** 
+/**
  * @brief Allows to release a connection object reported by \ref nopoll_conn_opts_new
  *
  * IMPORTANT NOTE: do not use this function over a \ref noPollConnOpts if it is not flagged with \ref nopoll_conn_opts_set_reuse (opts, nopoll_true).
@@ -435,7 +518,7 @@ void nopoll_conn_opts_free (noPollConnOpts * opts)
 	return;
 } /* end if */
 
-/** 
+/**
  * @internal API. Do not use it. It may change at any time without any
  * previous indication.
  */

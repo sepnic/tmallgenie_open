@@ -16,7 +16,7 @@
  *  License along with this program; if not, write to the Free
  *  Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
- *  
+ *
  *  You may find a copy of the license under this software is released
  *  at COPYING file. This is LGPL software: you are welcome to develop
  *  proprietary applications using this library without any royalty or
@@ -25,7 +25,7 @@
  *
  *  For commercial support on build Websocket enabled solutions
  *  contact us:
- *          
+ *
  *      Postal address:
  *         Advanced Software Production Line, S.L.
  *         Av. Juan Carlos I, Nº13, 2ºC
@@ -35,19 +35,30 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
 #ifndef __NOPOLL_DECL_H__
 #define __NOPOLL_DECL_H__
 
-/** 
+#include "nopoll_namespace.h"
+
+/**
  * \defgroup nopoll_decl_module Nopoll Declarations: Common Nopoll declarations, Types, macros, and support functions.
  */
 
-/** 
+/**
  * \addtogroup nopoll_decl_module
  * @{
  */
 
-/** 
+/**
  * @brief Set a default I/O wait limit from the default, which is 64
  * sockets to 4096. Note that this affects \ref nopoll_loop_wait (when
  * using select() API). If you change this value, you'll have to
@@ -58,7 +69,7 @@
  *   (What are the "64 sockets" limitations?)
  *
  * For Windows platforms, there are two 64-socket limitations:
- * 
+ *
  * The Windows event mechanism (e.g. WaitForMultipleObjects()) can
  * only wait on 64 event objects at a time. Winsock 2 provides the
  * WSAEventSelect() function which lets you use Windows’ event
@@ -67,7 +78,7 @@
  * time. If you want to wait on more than 64 Winsock event objects at
  * a time, you need to use multiple threads, each waiting on no more
  * than 64 of the sockets.
- * 
+ *
  * The select() function is also limited in certain situations to
  * waiting on 64 sockets at a time. The FD_SETSIZE constant defined in
  * the Winsock header determines the size of the fd_set structures you
@@ -96,10 +107,14 @@
 #endif
 
 /* include platform specific configuration */
-#include <nopoll_config.h>
+#include "nopoll_config.h"
 
 /* max buffer size to process incoming handshake */
+#if defined(NOPOLL_HAVE_LWIP_ENABLED)
+#define NOPOLL_HANDSHAKE_BUFFER_SIZE 2048
+#else
 #define NOPOLL_HANDSHAKE_BUFFER_SIZE 8192
+#endif
 
 /* include this at this place to load GNU extensions */
 #if defined(__GNUC__)
@@ -125,6 +140,15 @@
 #include <stdarg.h>
 #include <string.h>
 
+#if defined(NOPOLL_HAVE_SYSUTILS_ENABLED)
+#include "osal/os_common.h"
+#include "osal/os_misc.h"
+#include "osal/os_thread.h"
+#include "osal/os_time.h"
+#include "cutils/log_helper.h"
+#include "cutils/memory_helper.h"
+#endif
+
 /* only include unistd.h if unix platform is found or gnu gcc compiler
  * is found */
 #if defined(__GNUC__) || defined(NOPOLL_OS_UNIX)
@@ -141,7 +165,7 @@
 
 /* Portable definitions while using noPoll Library */
 #define NOPOLL_EINTR           EINTR
-/** 
+/**
  * @brief Portable definition for EWOULDBLOCK errno code.
  */
 #define NOPOLL_EWOULDBLOCK     EWOULDBLOCK
@@ -209,16 +233,27 @@
 
 #endif /* end defined(NOPOLL_OS_WINDOWS) */
 
-#if defined(NOPOLL_OS_UNIX)
-#include <sys/types.h>
-#include <fcntl.h>
+#if defined(NOPOLL_HAVE_LWIP_ENABLED)
+#include "lwip/sockets.h"
+#include "lwip/netdb.h"
+#include "lwip/def.h"
+	#ifdef nopoll_close_socket
+	#undef nopoll_close_socket
+	#endif
+	#define nopoll_close_socket(s) do {if ( s >= 0) {closesocket (s);}} while (0)
+#elif defined(NOPOLL_OS_UNIX)
 #include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/tcp.h>
+#endif
+
+#if defined(NOPOLL_OS_UNIX)
+#include <sys/types.h>
+#include <fcntl.h>
 #include <sys/select.h>
 #include <sys/time.h>
-#include <sys/resource.h>
 #include <time.h>
 #include <unistd.h>
 #endif
@@ -244,16 +279,16 @@
 #define errno (WSAGetLastError())
 #endif
 
-/** 
+/**
  * @brief Common definition to have false (\ref nopoll_false) value (which is defined to 0 integer value).
  */
 #define nopoll_false ((int)0)
-/** 
+/**
  * @brief Common definition to have true (\ref nopoll_true) value (which is defined to 1 integer value).
  */
 #define nopoll_true  ((int)1)
 
-/** 
+/**
  * @brief Bool definition for the Nopoll toolkit. This type built on
  * top of <b>int</b> is used along with \ref nopoll_false and \ref
  * nopoll_true to model those API functions and attributes that
@@ -261,7 +296,7 @@
  */
 typedef int nopoll_bool;
 
-/** 
+/**
  * @brief Pointer to any structure definition. It should be required
  * to use this definition, however, some platforms doesn't support the
  * <b>void *</b> making it necessary to use the <b>char *</b>
@@ -269,143 +304,143 @@ typedef int nopoll_bool;
  */
 typedef void * noPollPtr;
 
-/** 
+/**
  * @brief Execution context object used by the API to provide default
  * settings.
  */
 typedef struct _noPollCtx noPollCtx;
 
-/** 
- * @brief Abstraction that represents a connection that maybe be a listener created by \ref nopoll_listener_new or because the connection was received as a consequence of that call, or because it is a client connection created by \ref nopoll_conn_new 
+/**
+ * @brief Abstraction that represents a connection that maybe be a listener created by \ref nopoll_listener_new or because the connection was received as a consequence of that call, or because it is a client connection created by \ref nopoll_conn_new
  *
  * See noPoll API because there are other methods to create connections (not only previous mentioned functions).
  */
 typedef struct _noPollConn noPollConn;
 
-/** 
+/**
  * @brief Optional connection options to change default behaviour.
  */
 typedef struct _noPollConnOpts noPollConnOpts;
 
-/** 
+/**
  * @brief Abstraction that represents a selected IO wait mechanism.
  */
 typedef struct _noPollIoEngine noPollIoEngine;
 
-/** 
+/**
  * @brief Abstraction that represents a single websocket message
  * received.
  */
 typedef struct _noPollMsg noPollMsg;
 
-/** 
+/**
  * @brief Abstraction that represents the status and data exchanged
  * during the handshake.
  */
 typedef struct _noPollHandshake noPollHandShake;
 
-/** 
+/**
  * @brief Nopoll debug levels.
- * 
+ *
  * While reporting log to the console, these levels are used to report
  * the severity for such log.
  */
 typedef enum {
-	/** 
+	/**
 	 * @brief Debug level. Only used to report common
 	 * circumstances that represent the proper functionality.
 	 */
-	NOPOLL_LEVEL_DEBUG, 
-	/** 
+	NOPOLL_LEVEL_DEBUG,
+	/**
 	 * @brief Warning level. Only used to report that an internal
 	 * issue have happend that could be interesting while
 	 * reporting error, but it could also mean common situations.
 	 */
-	NOPOLL_LEVEL_WARNING, 
-	/** 
+	NOPOLL_LEVEL_WARNING,
+	/**
 	 * @brief Critical level. Only used to report critical
-	 * situations where some that have happened shouldn't. 
+	 * situations where some that have happened shouldn't.
 	 *
 	 * This level should only be used while reporting critical
 	 * situations.
 	 */
-	NOPOLL_LEVEL_CRITICAL}  
+	NOPOLL_LEVEL_CRITICAL}
 noPollDebugLevel;
 
-/** 
+/**
  * @brief Describes the connection role (how it was initiated).
  */
 typedef enum {
-	/** 
+	/**
 	 * @brief Unknown role, returned/used when the connection isn't defined.
 	 */
 	NOPOLL_ROLE_UNKNOWN,
-	/** 
+	/**
 	 * @brief When the connection was created connecting to a web
 	 * socket server (see \ref nopoll_conn_new).
 	 */
 	NOPOLL_ROLE_CLIENT,
-	/** 
+	/**
 	 * @brief When the connection was accepted being a listener
 	 * process.
 	 */
 	NOPOLL_ROLE_LISTENER,
-	/** 
+	/**
 	 * @brief When the connection was created by \ref
 	 * nopoll_listener_new to accept incoming connections.
 	 */
 	NOPOLL_ROLE_MAIN_LISTENER
 } noPollRole;
 
-/** 
+/**
  * @brief List of supported IO waiting mechanism available.
  */
 typedef enum {
-	/** 
+	/**
 	 * @brief Selects the default (best) IO mechanism found on the
 	 * system.
 	 */
 	NOPOLL_IO_ENGINE_DEFAULT,
-	/** 
+	/**
 	 * @brief Selects the select(2) based IO wait mechanism.
 	 */
 	NOPOLL_IO_ENGINE_SELECT,
-	/** 
+	/**
 	 * @brief Selects the poll(2) based IO wait mechanism.
 	 */
 	NOPOLL_IO_ENGINE_POLL,
-	/** 
+	/**
 	 * @brief Selects the epoll(2) based IO wait mechanism.
 	 */
 	NOPOLL_IO_ENGINE_EPOLL
 } noPollIoEngineType;
 
-/** 
+/**
  * @brief Support macro to allocate memory using nopoll_calloc function,
  * making a casting and using the sizeof keyword.
  *
  * @param type The type to allocate
  * @param count How many items to allocate.
- * 
+ *
  * @return A newly allocated pointer.
  */
 #define nopoll_new(type, count) (type *) nopoll_calloc (count, sizeof (type))
 
-/** 
+/**
  * @brief Allows to check a condition and return if it is not meet.
- * 
+ *
  * @param ctx The context where the operation will take place.
  * @param expr The expresion to check.
  */
 #define nopoll_return_if_fail(ctx, expr)					\
 	if (!(expr)) {__nopoll_log (ctx, __function_name__, __file__, __line__, NOPOLL_LEVEL_CRITICAL, "Expresion '%s' have failed at %s (%s:%d)", #expr, __NOPOLL_PRETTY_FUNCTION__, __NOPOLL_FILE__, __NOPOLL_LINE__); return;}
 
-/** 
+/**
  * @brief Allows to check a condition and return the given value if it
  * is not meet.
  *
  * @param ctx The context where the operation will take place.
- * 
+ *
  * @param expr The expresion to check.
  *
  * @param val The value to return if the expression is not meet.
@@ -414,11 +449,11 @@ typedef enum {
 	if (!(expr)) { __nopoll_log (ctx, __function_name__, __file__, __line__, NOPOLL_LEVEL_CRITICAL, "Expresion '%s' have failed, returning: %s at %s (%s:%d)", #expr, #val, __NOPOLL_PRETTY_FUNCTION__, __NOPOLL_FILE__, __NOPOLL_LINE__); return val;}
 
 
-/** 
+/**
  * @internal
  *
  * C++ support declarations borrowed from the libtool webpage. Thanks
- * you guys for this information. 
+ * you guys for this information.
  *
  * BEGIN_C_DECLS should be used at the beginning of your declarations,
  * so that C++ compilers don't mangle their names.  Use END_C_DECLS at
@@ -435,50 +470,51 @@ typedef enum {
 #endif
 
 
-/** 
+/**
  * @brief Type of frames and opcodes supported by noPoll.
  */
 typedef enum {
-	/** 
+	/**
 	 * @brief Support to model unknown op code.
 	 */
 	NOPOLL_UNKNOWN_OP_CODE = -1,
-	/** 
+	/**
 	 * @brief Denotes a continuation frame.
 	 */
 	NOPOLL_CONTINUATION_FRAME = 0,
-	/** 
+	/**
 	 * @brief Denotes a text frame (utf-8 content) and the first
 	 * frame of the message.
 	 */
 	NOPOLL_TEXT_FRAME         = 1,
-	/** 
+	/**
 	 * @brief Denotes a binary frame and the first frame of the
 	 * message.
 	 */
 	NOPOLL_BINARY_FRAME       = 2,
-	/** 
+	/**
 	 * @brief Denotes a close frame request.
 	 */
 	NOPOLL_CLOSE_FRAME        = 8,
-	/** 
+	/**
 	 * @brief Denotes a ping frame (used to ring test the circuit
 	 * and to keep alive the connection).
 	 */
 	NOPOLL_PING_FRAME         = 9,
-	/** 
+	/**
 	 * @brief Denotes a pong frame (reply to ping request).
 	 */
 	NOPOLL_PONG_FRAME         = 10
 } noPollOpCode;
 
-/** 
+#if !defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
+/**
  * @brief SSL/TLS protocol type to use for the client or listener
- * connection. 
+ * connection.
  */
 typedef enum {
-#if defined(NOPOLL_HAVE_SSLv23_ENABLED)	
-	/** 
+#if defined(NOPOLL_HAVE_SSLv23_ENABLED)
+	/**
 	 * @brief Allows to define SSLv23 as SSL protocol used by the
 	 * client or server connection. A TLS/SSL connection
 	 * established with these methods may understand SSLv3, TLSv1,
@@ -486,8 +522,8 @@ typedef enum {
 	 */
 	NOPOLL_METHOD_SSLV23      = 2,
 #endif
-#if defined(NOPOLL_HAVE_SSLv3_ENABLED)	
-	/** 
+#if defined(NOPOLL_HAVE_SSLv3_ENABLED)
+	/**
 	 * @brief Allows to define SSLv3 as SSL protocol used by the
 	 * client or server connection. A connection/listener
 	 * established with this method will only understand this
@@ -496,16 +532,16 @@ typedef enum {
 	NOPOLL_METHOD_SSLV3       = 3,
 #endif
 #if defined(NOPOLL_HAVE_TLSv10_ENABLED)
-	/** 
+	/**
 	 * @brief Allows to define TLSv1 as SSL protocol used by the
 	 * client or server connection. A connection/listener
 	 * established with this method will only understand this
 	 * method.
 	 */
 	NOPOLL_METHOD_TLSV1       = 4,
-#endif	
+#endif
 #if defined(NOPOLL_HAVE_TLSv11_ENABLED)
-	/** 
+	/**
 	 * @brief Allows to define TLSv1.1 as SSL protocol used by the
 	 * client or server connection. A connection/listener
 	 * established with this method will only understand this
@@ -515,7 +551,7 @@ typedef enum {
 #endif
 #if defined(NOPOLL_HAVE_TLSv12_ENABLED)
 	,
-	/** 
+	/**
 	 * @brief Allows to define TLSv1.2 as SSL protocol used by the
 	 * client or server connection. A connection/listener
 	 * established with this method will only understand this
@@ -525,11 +561,11 @@ typedef enum {
 #endif
 #if defined(NOPOLL_HAVE_TLS_FLEXIBLE_ENABLED)
 	,
-	/** 
+	/**
 	 * @brief Allows to define TLS flexible negotiation where the
 	 * highest version available will be negotiated by both
 	 * ends. If you want a particular TLS version, do not use this
-	 * method. 
+	 * method.
 	 *
 	 * Security consideration: by using this method you are
 	 * accepting that the remote peer can downgrade to the lowest
@@ -537,31 +573,38 @@ typedef enum {
 	 * particular version do not use this flexible method.
 	 */
 	NOPOLL_METHOD_TLS_FLEXIBLE     = 7
-#endif		
+#endif
 } noPollSslProtocol ;
+#endif
 
-/** 
+/**
  * @brief Transport indication to be used by various internal and
  * public APIs
  */
 typedef enum {
-	/** 
+	/**
 	 * Use IPv4 transport
 	 */
 	NOPOLL_TRANSPORT_IPV4 = 1,
-	/** 
+#if defined(NOPOLL_HAVE_IPV6_ENABLED)
+	/**
 	 * Use IPv6 transport
 	 */
 	NOPOLL_TRANSPORT_IPV6 = 2
+#endif
 } noPollTransport;
 
 BEGIN_C_DECLS
 
+#if defined(NOPOLL_HAVE_SYSUTILS_ENABLED)
+#define nopoll_calloc(count, size) OS_CALLOC(count, size)
+#define nopoll_realloc(ref, size)  OS_REALLOC(ref, size)
+#define nopoll_free(ref)           OS_FREE(ref)
+#else
 noPollPtr  nopoll_calloc  (size_t count, size_t size);
-
 noPollPtr  nopoll_realloc (noPollPtr ref, size_t size);
-
 void       nopoll_free    (noPollPtr ref);
+#endif
 
 END_C_DECLS
 

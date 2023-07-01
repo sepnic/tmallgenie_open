@@ -35,8 +35,17 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
-#include <nopoll_io.h>
-#include <nopoll_private.h>
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
+#include "nopoll_io.h"
+#include "nopoll_private.h"
 
 typedef struct _noPollSelect {
 	noPollCtx          * ctx;

@@ -42,6 +42,8 @@
 
 #if defined(NOPOLL_OS_WIN32)
 
+#include <nopoll_win32.h>
+
 nopoll_bool __nopoll_win32_was_init = nopoll_false;
 
 int  nopoll_win32_init (noPollCtx * ctx)

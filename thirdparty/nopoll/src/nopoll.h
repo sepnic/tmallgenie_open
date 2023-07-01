@@ -16,7 +16,7 @@
  *  License along with this program; if not, write to the Free
  *  Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
- *  
+ *
  *  You may find a copy of the license under this software is released
  *  at COPYING file. This is LGPL software: you are welcome to develop
  *  proprietary applications using this library without any royalty or
@@ -25,7 +25,7 @@
  *
  *  For commercial support on build Websocket enabled solutions
  *  contact us:
- *          
+ *
  *      Postal address:
  *         Advanced Software Production Line, S.L.
  *         Av. Juan Carlos I, Nº13, 2ºC
@@ -35,29 +35,39 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
 #ifndef __NOPOLL_H__
 #define __NOPOLL_H__
 
-#include <nopoll_decl.h>
-#include <nopoll_handlers.h>
+#include "nopoll_namespace.h"
+#include "nopoll_decl.h"
+#include "nopoll_handlers.h"
 
 BEGIN_C_DECLS
 
 #if defined(NOPOLL_OS_WIN32)
-#include <nopoll_win32.h>
+#include "nopoll_win32.h"
 #endif
 
-#include <nopoll_ctx.h>
-#include <nopoll_io.h>
-#include <nopoll_conn_opts.h>
-#include <nopoll_conn.h>
-#include <nopoll_msg.h>
-#include <nopoll_log.h>
-#include <nopoll_listener.h>
-#include <nopoll_io.h>
-#include <nopoll_loop.h>
+#include "nopoll_ctx.h"
+#include "nopoll_io.h"
+#include "nopoll_conn_opts.h"
+#include "nopoll_conn.h"
+#include "nopoll_msg.h"
+#include "nopoll_log.h"
+#include "nopoll_listener.h"
+#include "nopoll_io.h"
+#include "nopoll_loop.h"
 
-/** 
+/**
  * \addtogroup nopoll_module
  * @{
  */
@@ -65,6 +75,8 @@ BEGIN_C_DECLS
 nopoll_bool nopoll_cmp (const char * string1, const char * string2);
 
 nopoll_bool nopoll_ncmp (const char * string1, const char * string2, int bytes);
+
+int         nopoll_vprintf_len (const char * format, va_list args);
 
 char      * nopoll_strdup_printf   (const char * chunk, ...);
 
@@ -87,17 +99,17 @@ void        nopoll_mutex_unlock  (noPollPtr mutex);
 
 void        nopoll_mutex_destroy (noPollPtr mutex);
 
-nopoll_bool nopoll_base64_encode (const char * content, 
-				  int          length, 
-				  char       * output, 
+nopoll_bool nopoll_base64_encode (const char * content,
+				  int          length,
+				  char       * output,
 				  int        * output_size);
 
-nopoll_bool nopoll_base64_decode (const char * content, 
-				  int          length, 
-				  char       * output, 
+nopoll_bool nopoll_base64_decode (const char * content,
+				  int          length,
+				  char       * output,
 				  int        * output_size);
 
-int         nopoll_timeval_substract  (struct timeval * a, 
+int         nopoll_timeval_substract  (struct timeval * a,
 				       struct timeval * b,
 				       struct timeval * result);
 

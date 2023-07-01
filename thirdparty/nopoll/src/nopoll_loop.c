@@ -16,7 +16,7 @@
  *  License along with this program; if not, write to the Free
  *  Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
- *  
+ *
  *  You may find a copy of the license under this software is released
  *  at COPYING file. This is LGPL software: you are welcome to develop
  *  proprietary applications using this library without any royalty or
@@ -25,7 +25,7 @@
  *
  *  For commercial support on build Websocket enabled solutions
  *  contact us:
- *          
+ *
  *      Postal address:
  *         Advanced Software Production Line, S.L.
  *         Av. Juan Carlos I, Nº13, 2ºC
@@ -35,19 +35,28 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
-#include <nopoll_loop.h>
-#include <nopoll_private.h>
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
+#include "nopoll_loop.h"
+#include "nopoll_private.h"
 
-/** 
+/**
  * \defgroup nopoll_loop noPoll Loop: basic support to create a watching loop for WebSocket listeners
  */
 
-/** 
+/**
  * \addtogroup nopoll_loop
  * @{
  */
 
-/** 
+/**
  * @internal Function used by nopoll_loop_wait to register all
  * connections into the io waiting object.
  */
@@ -55,7 +64,7 @@ nopoll_bool nopoll_loop_register (noPollCtx * ctx, noPollConn * conn, noPollPtr 
 {
 	/* do not add connections that aren't working */
 	if (! nopoll_conn_is_ok (conn)) {
-		
+
 		/* remove this connection from registry */
 		nopoll_ctx_unregister_conn (ctx, conn);
 
@@ -75,7 +84,7 @@ nopoll_bool nopoll_loop_register (noPollCtx * ctx, noPollConn * conn, noPollPtr 
 	return nopoll_false; /* keep foreach, don't stop */
 }
 
-/** 
+/**
  * @internal Function used to handle incoming data from from the
  * connection and to notify this data on the connection.
  */
@@ -89,7 +98,7 @@ void nopoll_loop_process_data (noPollCtx * ctx, noPollConn * conn)
 		return;
 
 	/* found message, notify it */
-	if (conn->on_msg) 
+	if (conn->on_msg)
 		conn->on_msg (ctx, conn, msg, conn->on_msg_data);
 	else if (ctx->on_msg)
 		ctx->on_msg (ctx, conn, msg, ctx->on_msg_data);
@@ -99,7 +108,7 @@ void nopoll_loop_process_data (noPollCtx * ctx, noPollConn * conn)
 	return;
 }
 
-/** 
+/**
  * @internal Function used to detected which connections has something
  * interesting to be notified.
  *
@@ -127,15 +136,15 @@ nopoll_bool nopoll_loop_process (noPollCtx * ctx, noPollConn * conn, noPollPtr u
 			nopoll_conn_shutdown (conn);
 			break;
 		}
-		
+
 		/* reduce connection changed */
 		(*conn_changed)--;
 	} /* end if */
-	
+
 	return (*conn_changed) == 0;
 }
 
-/** 
+/**
  * @internal Function used to init internal io wait mechanism
  * associated to the provided context. If the io wait engine is
  * already initialized, the function does nothing.
@@ -150,7 +159,7 @@ nopoll_bool nopoll_loop_process (noPollCtx * ctx, noPollConn * conn, noPollPtr u
  * call again nopoll_loop_wait.
  *
  */
-void nopoll_loop_init (noPollCtx * ctx) 
+void nopoll_loop_init (noPollCtx * ctx)
 {
 	if (ctx == NULL)
 		return;
@@ -161,14 +170,14 @@ void nopoll_loop_init (noPollCtx * ctx)
 		if (ctx->io_engine == NULL) {
 			nopoll_log (ctx, NOPOLL_LEVEL_CRITICAL, "Failed to create IO wait engine, unable to implement wait call");
 			return;
-		} 
+		}
 	} /* end if */
 	/* release the mutex */
 
 	return;
 }
 
-/** 
+/**
  * @brief Flag to stop the current loop implemented (if any) on the provided context.
  *
  * @param ctx The context where the loop is being done, and wanted to
@@ -183,7 +192,7 @@ void nopoll_loop_stop (noPollCtx * ctx)
 	return;
 } /* end if */
 
-/** 
+/**
  * @brief Allows to implement a wait over all connections registered
  * under the provided context during the provided timeout until
  * something is detected meaningful to the user, calling to the action
@@ -236,7 +245,7 @@ int nopoll_loop_wait (noPollCtx * ctx, long timeout)
 
 	nopoll_return_val_if_fail (ctx, ctx, -2);
 	nopoll_return_val_if_fail (ctx, timeout >= 0, -2);
-	
+
 	/* call to init io engine */
 	nopoll_loop_init (ctx);
 
@@ -247,14 +256,14 @@ int nopoll_loop_wait (noPollCtx * ctx, long timeout)
 #else
 		gettimeofday (&start, NULL);
 #endif
-	
+
 	/* set to keep looping everything this function is called */
 	ctx->keep_looping = nopoll_true;
 
 	while (ctx->keep_looping) {
 		/* ok, now implement wait operation */
 		ctx->io_engine->clear (ctx, ctx->io_engine->io_object);
-		
+
 		/* add all connections */
 		/* nopoll_log (ctx, NOPOLL_LEVEL_DEBUG, "Adding connections to watch: %d", ctx->conn_num);  */
 		nopoll_ctx_foreach_conn (ctx, nopoll_loop_register, NULL);
@@ -264,9 +273,9 @@ int nopoll_loop_wait (noPollCtx * ctx, long timeout)
 			 * working, try to check them */
 			/* nopoll_ctx_foreach_conn (ctx, nopoll_loop_clean_descriptors, NULL); */
 		/* nopoll_log (ctx, NOPOLL_LEVEL_CRITICAL, "Found some descriptor is not valid (errno==%d)", errno);
-		   continue; */ 
+		   continue; */
 		/* } */ /* end if */
-		
+
 		/* implement wait operation */
 		/* nopoll_log (ctx, NOPOLL_LEVEL_DEBUG, "Waiting for changes into %d connections", ctx->conn_num); */
 		wait_status = ctx->io_engine->wait (ctx, ctx->io_engine->io_object);

@@ -39,6 +39,7 @@
 #ifndef __NOPOLL_WIN32_H__
 #define __NOPOLL_WIN32_H__
 
+#include <nopoll_namespace.h>
 #include <nopoll_ctx.h>
 
 BEGIN_C_DECLS

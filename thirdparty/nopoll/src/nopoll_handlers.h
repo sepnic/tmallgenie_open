@@ -16,7 +16,7 @@
  *  License along with this program; if not, write to the Free
  *  Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
- *  
+ *
  *  You may find a copy of the license under this software is released
  *  at COPYING file. This is LGPL software: you are welcome to develop
  *  proprietary applications using this library without any royalty or
@@ -25,7 +25,7 @@
  *
  *  For commercial support on build Websocket enabled solutions
  *  contact us:
- *          
+ *
  *      Postal address:
  *         Advanced Software Production Line, S.L.
  *         Av. Juan Carlos I, Nº13, 2ºC
@@ -35,19 +35,30 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
 #ifndef __NOPOLL_HANDLERS_H__
 #define __NOPOLL_HANDLERS_H__
 
-/** 
+#include "nopoll_namespace.h"
+
+/**
  * \defgroup nopoll_handlers noPoll Handlers: Handler definitions used by the library to du async notifications
  */
 
-/** 
+/**
  * \addtogroup nopoll_handlers
  * @{
  */
 
-/** 
+/**
  * @brief General async handler definition used to notify generic
  * events associated to a connection.
  *
@@ -67,14 +78,14 @@
  */
 typedef nopoll_bool (*noPollActionHandler) (noPollCtx * ctx, noPollConn * conn, noPollPtr user_data);
 
-/** 
+/**
  * @brief Handler used to define the create function for an IO mechanism.
  *
  * @param ctx The context where the io mechanism will be created.
  */
 typedef noPollPtr (*noPollIoMechCreate)  (noPollCtx * ctx);
 
-/** 
+/**
  * @brief Handler used to define the IO wait set destroy function for
  * an IO mechanism.
  *
@@ -85,7 +96,7 @@ typedef noPollPtr (*noPollIoMechCreate)  (noPollCtx * ctx);
  */
 typedef void (*noPollIoMechDestroy)  (noPollCtx * ctx, noPollPtr io_object);
 
-/** 
+/**
  * @brief Handler used to define the IO wait set clear function for an
  * IO mechanism.
  *
@@ -97,7 +108,7 @@ typedef void (*noPollIoMechDestroy)  (noPollCtx * ctx, noPollPtr io_object);
 typedef void (*noPollIoMechClear)  (noPollCtx * ctx, noPollPtr io_object);
 
 
-/** 
+/**
  * @brief Handler used to define the IO wait function for an IO
  * mechanism.
  *
@@ -109,7 +120,7 @@ typedef void (*noPollIoMechClear)  (noPollCtx * ctx, noPollPtr io_object);
 typedef int (*noPollIoMechWait)  (noPollCtx * ctx, noPollPtr io_object);
 
 
-/** 
+/**
  * @brief Handler used to define the IO add to set function for an IO
  * mechanism.
  *
@@ -120,13 +131,13 @@ typedef int (*noPollIoMechWait)  (noPollCtx * ctx, noPollPtr io_object);
  * @param io_object The io object to be created as created by \ref
  * noPollIoMechCreate handler where the wait will be implemented.
  */
-typedef nopoll_bool (*noPollIoMechAddTo)  (int               fds, 
+typedef nopoll_bool (*noPollIoMechAddTo)  (int               fds,
 					   noPollCtx       * ctx,
 					   noPollConn      * conn,
 					   noPollPtr         io_object);
 
 
-/** 
+/**
  * @brief Handler used to define the IO is set function for an IO
  * mechanism.
  *
@@ -138,10 +149,10 @@ typedef nopoll_bool (*noPollIoMechAddTo)  (int               fds,
  * noPollIoMechCreate handler where the wait will be implemented.
  */
 typedef nopoll_bool (*noPollIoMechIsSet)  (noPollCtx       * ctx,
-					   int               fds, 
+					   int               fds,
 					   noPollPtr         io_object);
 
-/** 
+/**
  * @brief Handler used to define the foreach function that is used by
  * \ref nopoll_ctx_foreach_conn
  *
@@ -160,7 +171,7 @@ typedef nopoll_bool (*noPollForeachConn)  (noPollCtx  * ctx,
 					   noPollConn * conn,
 					   noPollPtr    user_data);
 
-/** 
+/**
  * @brief Handler definition used to describe read functions used by \ref noPollConn.
  *
  * @param conn The connection where the readOperation will take place.
@@ -173,7 +184,7 @@ typedef int (*noPollRead) (noPollConn * conn,
 			   char       * buffer,
 			   int          buffer_size);
 
-/** 
+/**
  * @brief Handler definition used to notify websocket messages
  * received.
  *
@@ -196,7 +207,7 @@ typedef void (*noPollOnMessageHandler) (noPollCtx  * ctx,
 					noPollMsg  * msg,
 					noPollPtr    user_data);
 
-/** 
+/**
  * @brief Handler definition used by \ref nopoll_conn_set_on_close.
  *
  * Handler definition for the function that is called when the
@@ -211,44 +222,44 @@ typedef void (*noPollOnMessageHandler) (noPollCtx  * ctx,
  * into the handler.
  */
 typedef void (*noPollOnCloseHandler)    (noPollCtx  * ctx,
-					 noPollConn * conn, 
+					 noPollConn * conn,
 					 noPollPtr    user_data);
 
-/** 
+/**
  * @brief Mutex creation handler used by the library.
  *
  * @return A reference to the mutex created (already initialized).
  */
 typedef noPollPtr (*noPollMutexCreate) (void);
 
-/** 
+/**
  * @brief Mutex destroy handler used by the library.
  *
  * @param The mutex to destroy.
  */
 typedef void (*noPollMutexDestroy) (noPollPtr mutex);
 
-/** 
+/**
  * @brief Mutex lock handler used by the library.
  *
  * @param The mutex where to implement the lock operation.
  */
 typedef void (*noPollMutexLock) (noPollPtr mutex);
 
-/** 
+/**
  * @brief Mutex unlock handler used by the library.
  *
  * @param The mutex where to implement the unlock operation.
  */
 typedef void (*noPollMutexUnlock) (noPollPtr mutex);
 
-/** 
+/**
  * @brief Handler used by nopoll_log_set_handler to receive all log
  * notifications produced by the library on this function.
  *
  * @param ctx The context where the operation is happening.
  *
- * @param level The log level 
+ * @param level The log level
  *
  * @param log_msg The actual log message reported.
  *
@@ -256,7 +267,8 @@ typedef void (*noPollMutexUnlock) (noPollPtr mutex);
  */
 typedef void (*noPollLogHandler) (noPollCtx * ctx, noPollDebugLevel level, const char * log_msg, noPollPtr user_data);
 
-/** 
+#if !defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
+/**
  * @brief An optional handler that allows user land code to define how
  * is SSL_CTX (SSL context) created and which are the settings it
  * should have before taking place SSL/TLS handshake.
@@ -267,11 +279,11 @@ typedef void (*noPollLogHandler) (noPollCtx * ctx, noPollDebugLevel level, const
  *
  * A very bare implementation for this context creation will be:
  *
- * \code 
+ * \code
  * SSL_CTX * my_ssl_ctx_creator (noPollCtx * ctx, noPollConn * conn, noPollConnOpts * opts, nopoll_bool is_client, noPollPtr user_data)
  * {
  *        // very basic context creation using default settings provided by OpenSSL
- *        return SSL_CTX_new (is_client ? TLSv1_client_method () : TLSv1_server_method ()); 
+ *        return SSL_CTX_new (is_client ? TLSv1_client_method () : TLSv1_server_method ());
  * }
  * \endcode
  *
@@ -287,13 +299,13 @@ typedef void (*noPollLogHandler) (noPollCtx * ctx, noPollDebugLevel level, const
  *
  * @return The function must return a valid SSL_CTX object (see OpenSSL documentation to know more about this) or NULL if it fails.
  */
-typedef noPollPtr (*noPollSslContextCreator) (noPollCtx       * ctx, 
-					      noPollConn      * conn, 
-					      noPollConnOpts  * opts, 
-					      nopoll_bool       is_client, 
+typedef noPollPtr (*noPollSslContextCreator) (noPollCtx       * ctx,
+					      noPollConn      * conn,
+					      noPollConnOpts  * opts,
+					      nopoll_bool       is_client,
 					      noPollPtr         user_data);
 
-/** 
+/**
  * @brief Optional user defined handler that allows to execute SSL
  * post checks code before proceed.
  *
@@ -321,7 +333,7 @@ typedef nopoll_bool (*noPollSslPostCheck) (noPollCtx      * ctx,
 					   noPollPtr        SSL_CTX,
 					   noPollPtr        SSL,
 					   noPollPtr        user_data);
-
+#endif
 
 #endif
 

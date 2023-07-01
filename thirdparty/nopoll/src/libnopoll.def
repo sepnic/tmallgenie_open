@@ -23,7 +23,6 @@ __nopoll_mutex_create
 __nopoll_mutex_destroy
 __nopoll_mutex_lock
 __nopoll_mutex_unlock
-__nopoll_nonce_init
 __nopoll_pack_content
 __nopoll_tls_was_init
 nopoll_base64_decode

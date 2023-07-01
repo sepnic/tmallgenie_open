@@ -19,8 +19,8 @@ libtool
 ltmain.sh
 missing
 nopoll.pc
-src/nopoll_config.h
 stamp-h1
 test-driver
-test/nopoll-regression-client
-test/nopoll-regression-listener
+.DS_Store
+*.patch
+*.diff

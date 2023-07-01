@@ -16,7 +16,7 @@
  *  License along with this program; if not, write to the Free
  *  Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
- *  
+ *
  *  You may find a copy of the license under this software is released
  *  at COPYING file. This is LGPL software: you are welcome to develop
  *  proprietary applications using this library without any royalty or
@@ -25,7 +25,7 @@
  *
  *  For commercial support on build Websocket enabled solutions
  *  contact us:
- *          
+ *
  *      Postal address:
  *         Advanced Software Production Line, S.L.
  *         Av. Juan Carlos I, Nº13, 2ºC
@@ -35,19 +35,28 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
-#include <nopoll_listener.h>
-#include <nopoll_private.h>
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
+#include "nopoll_listener.h"
+#include "nopoll_private.h"
 
-/** 
+/**
  * \defgroup nopoll_listener noPoll Listener: functions required to create WebSocket listener connections.
  */
 
-/** 
+/**
  * \addtogroup nopoll_listener
  * @{
  */
 
-/* 
+/*
  * @internal Implementation used by all sock listener functions.
  */
 NOPOLL_SOCKET     __nopoll_listener_sock_listen_internal      (noPollCtx        * ctx,
@@ -62,13 +71,11 @@ NOPOLL_SOCKET     __nopoll_listener_sock_listen_internal      (noPollCtx        
 
 #if defined(NOPOLL_OS_WIN32)
 	int                  sin_size  = sizeof (sin);
-#else    	
-	int                  unit      = 1; 
+#else
+	int                  unit      = 1;
 	socklen_t            sin_size  = sizeof (sin);
-#endif	
-#if defined(SHOW_DEBUG_LOG)
-	uint16_t             int_port;
 #endif
+	uint16_t             int_port;
 	int                  bind_res;
 
 	nopoll_return_val_if_fail (ctx, ctx,  -2);
@@ -85,14 +92,15 @@ NOPOLL_SOCKET     __nopoll_listener_sock_listen_internal      (noPollCtx        
 		hints.ai_family   = AF_INET;
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_flags    = AI_PASSIVE | AI_NUMERICHOST;
-		
+
 		/* resolve hosting name */
 		if (getaddrinfo (host, port, &hints, &res) != 0) {
 			nopoll_log (ctx, NOPOLL_LEVEL_WARNING, "unable to resolve host name %s, errno=%d", host, errno);
 			return -1;
 		} /* end if */
-		
+
 		break;
+#if defined(NOPOLL_HAVE_IPV6_ENABLED)
 	case NOPOLL_TRANSPORT_IPV6:
 		/* configure hints */
 		hints.ai_family   = AF_INET6;
@@ -104,20 +112,25 @@ NOPOLL_SOCKET     __nopoll_listener_sock_listen_internal      (noPollCtx        
 			nopoll_log (ctx, NOPOLL_LEVEL_CRITICAL, "Received an address (%s) that is not a valid IPv6 address..", host);
 			return -1;
 		} /* end if */
-		
+
 		/* resolve hosting name */
 		if (getaddrinfo (host, port, &hints, &res) != 0) {
 			nopoll_log (ctx, NOPOLL_LEVEL_WARNING, "unable to resolve host name %s, errno=%d", host, errno);
 			return -1;
 		} /* end if */
 		break;
+#endif
 	} /* end switch */
 
 	/* create socket */
 	fd = socket (res->ai_family, res->ai_socktype, res->ai_protocol);
+#if defined(NOPOLL_HAVE_LWIP_ENABLED)
+	if (fd < 0) {
+#else
 	if (fd <= 2) {
 		/* do not allow creating sockets reusing stdin (0),
 		   stdout (1), stderr (2) */
+#endif
 		nopoll_log (ctx, NOPOLL_LEVEL_DEBUG, "failed to create listener socket: %d (errno=%d)", fd, errno);
 		freeaddrinfo (res);
 		return -1;
@@ -135,13 +148,10 @@ NOPOLL_SOCKET     __nopoll_listener_sock_listen_internal      (noPollCtx        
 	/* setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char  *)&unit, sizeof(BOOL)); */
 #else
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &unit, sizeof (unit));
-#endif 
-
-#if defined(SHOW_DEBUG_LOG)
-	/* get integer port */
-	int_port  = (uint16_t) atoi (port);
 #endif
 
+	/* get integer port */
+	int_port  = (uint16_t) atoi (port);
 	/* call to bind */
 	tries    = 0;
 	while (1) {
@@ -151,15 +161,15 @@ NOPOLL_SOCKET     __nopoll_listener_sock_listen_internal      (noPollCtx        
 			/* check if we can retry */
 			tries++;
 			if (tries < 25) {
-				nopoll_log (ctx, NOPOLL_LEVEL_WARNING, 
-					    "unable to bind address (port:%u already in use or insufficient permissions, errno=%d : %s), retrying=%d on socket: %d", 
+				nopoll_log (ctx, NOPOLL_LEVEL_WARNING,
+					    "unable to bind address (port:%u already in use or insufficient permissions, errno=%d : %s), retrying=%d on socket: %d",
 					    int_port, errno, strerror (errno), tries, fd);
 				nopoll_sleep (100000);
 				continue;
 			} /* end if */
 
-			nopoll_log (ctx, NOPOLL_LEVEL_CRITICAL, 
-				    "unable to bind address (port:%u already in use or insufficient permissions, errno=%d : %s). Closing socket: %d", 
+			nopoll_log (ctx, NOPOLL_LEVEL_CRITICAL,
+				    "unable to bind address (port:%u already in use or insufficient permissions, errno=%d : %s). Closing socket: %d",
 				    int_port, errno, strerror (errno), fd);
 			nopoll_close_socket (fd);
 
@@ -174,7 +184,7 @@ NOPOLL_SOCKET     __nopoll_listener_sock_listen_internal      (noPollCtx        
 
 	/* release addr info */
 	freeaddrinfo (res);
-	
+
 	if (listen(fd, ctx->backlog) == NOPOLL_SOCKET_ERROR) {
 		nopoll_log (ctx, NOPOLL_LEVEL_CRITICAL, "an error have occur while executing listen");
 		return -1;
@@ -190,7 +200,7 @@ NOPOLL_SOCKET     __nopoll_listener_sock_listen_internal      (noPollCtx        
 	return fd;
 }
 
-/** 
+/**
  * @internal Function to create a WebSocket listener
  */
 noPollConn      * __nopoll_listener_new_opts_internal (noPollCtx      * ctx,
@@ -242,7 +252,7 @@ noPollConn      * __nopoll_listener_new_opts_internal (noPollCtx      * ctx,
 }
 
 
-/** 
+/**
  * @internal Creates a listener socket on the provided port.
  */
 NOPOLL_SOCKET     nopoll_listener_sock_listen      (noPollCtx   * ctx,
@@ -252,7 +262,7 @@ NOPOLL_SOCKET     nopoll_listener_sock_listen      (noPollCtx   * ctx,
 	return __nopoll_listener_sock_listen_internal (ctx, NOPOLL_TRANSPORT_IPV4, host, port);
 }
 
-/** 
+/**
  * @brief Creates a new websocket server listener on the provided host
  * name and port (IPv4)
  *
@@ -272,7 +282,8 @@ noPollConn      * nopoll_listener_new (noPollCtx  * ctx,
 	return nopoll_listener_new_opts (ctx, NULL, host, port);
 }
 
-/** 
+#if defined(NOPOLL_HAVE_IPV6_ENABLED)
+/**
  * @brief Creates a new websocket server listener on the provided host
  * name and port (IPv6).
  *
@@ -292,8 +303,9 @@ noPollConn      * nopoll_listener_new6 (noPollCtx  * ctx,
 {
 	return __nopoll_listener_new_opts_internal (ctx, NOPOLL_TRANSPORT_IPV6, NULL, host, port);
 }
+#endif
 
-/** 
+/**
  * @brief Creates a new websocket server listener on the provided host
  * name and port (IPv4).
  *
@@ -317,7 +329,8 @@ noPollConn      * nopoll_listener_new_opts (noPollCtx      * ctx,
 	return __nopoll_listener_new_opts_internal (ctx, NOPOLL_TRANSPORT_IPV4, opts, host, port);
 }
 
-/** 
+#if defined(NOPOLL_HAVE_IPV6_ENABLED)
+/**
  * @brief Creates a new websocket server listener on the provided host
  * name and port (IPv6).
  *
@@ -341,8 +354,9 @@ noPollConn      * nopoll_listener_new_opts6 (noPollCtx      * ctx,
 	/* call common implementation */
 	return __nopoll_listener_new_opts_internal (ctx, NOPOLL_TRANSPORT_IPV6, opts, host, port);
 }
+#endif
 
-/** 
+/**
  * @brief Allows to create a new WebSocket listener but expecting the
  * incoming connection to be under TLS supervision. The function works
  * like \ref nopoll_listener_new (providing wss:// services) (IPv4 version).
@@ -363,7 +377,8 @@ noPollConn      * nopoll_listener_tls_new (noPollCtx  * ctx,
 	return nopoll_listener_tls_new_opts (ctx, NULL, host, port);
 }
 
-/** 
+#if defined(NOPOLL_HAVE_IPV6_ENABLED)
+/**
  * @brief Allows to create a new WebSocket listener but expecting the
  * incoming connection to be under TLS supervision. The function works
  * like \ref nopoll_listener_new (providing wss:// services) (IPv6 version).
@@ -384,10 +399,10 @@ noPollConn      * nopoll_listener_tls_new6 (noPollCtx  * ctx,
 {
 	return nopoll_listener_tls_new_opts6 (ctx, NULL, host, port);
 }
+#endif
 
-
-/** 
- * @internal Common implementation 
+/**
+ * @internal Common implementation
  */
 noPollConn      * __nopoll_listener_tls_new_opts_internal (noPollCtx      * ctx,
 							   noPollTransport  transport,
@@ -409,7 +424,7 @@ noPollConn      * __nopoll_listener_tls_new_opts_internal (noPollCtx      * ctx,
 	return listener;
 }
 
-/** 
+/**
  * @brief Allows to create a new WebSocket listener but expecting the
  * incoming connection to be under TLS supervision. The function works
  * like \ref nopoll_listener_new (providing wss:// services) (IPv4 version).
@@ -434,8 +449,8 @@ noPollConn      * nopoll_listener_tls_new_opts (noPollCtx      * ctx,
 	return __nopoll_listener_tls_new_opts_internal (ctx, NOPOLL_TRANSPORT_IPV4, opts, host, port);
 }
 
-
-/** 
+#if defined(NOPOLL_HAVE_IPV6_ENABLED)
+/**
  * @brief Allows to create a new WebSocket listener but expecting the
  * incoming connection to be under TLS supervision. The function works
  * like \ref nopoll_listener_new (providing wss:// services) (IPv6 version).
@@ -459,8 +474,10 @@ noPollConn      * nopoll_listener_tls_new_opts6 (noPollCtx      * ctx,
 {
 	return __nopoll_listener_tls_new_opts_internal (ctx, NOPOLL_TRANSPORT_IPV6, opts, host, port);
 }
+#endif
 
-/** 
+
+/**
  * @brief Allows to configure the TLS certificate and key to be used
  * on the provided connection.
  *
@@ -479,18 +496,60 @@ noPollConn      * nopoll_listener_tls_new_opts6 (noPollCtx      * ctx,
  * @return nopoll_true if the certificates were configured, otherwise
  * nopoll_false is returned.
  */
+#if defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
+nopoll_bool           nopoll_listener_set_certificate (noPollConn * listener,
+						       const char * certificate,
+						       int          certificate_size,
+						       const char * private_key,
+						       int          private_key_size,
+						       const char * chain_file,
+						       int          chain_file_size)
+#else
 nopoll_bool           nopoll_listener_set_certificate (noPollConn * listener,
 						       const char * certificate,
 						       const char * private_key,
 						       const char * chain_file)
+#endif
 {
-	FILE * handle;
-
 	if (! listener || ! certificate || ! private_key)
 		return nopoll_false;
 
+#if defined(NOPOLL_HAVE_MBEDTLS_ENABLED)
+	listener->certificate = nopoll_new(char, certificate_size);
+	listener->private_key = nopoll_new(char, private_key_size);
+	if (chain_file)
+		listener->chain_certificate = nopoll_new(char, chain_file_size);
+
+	if ((listener->certificate == NULL)
+	    || (listener->private_key == NULL)
+	    || (chain_file && (listener->chain_certificate == NULL))) {
+		nopoll_log (listener->ctx, NOPOLL_LEVEL_CRITICAL, "nopoll new failed\n");
+		if (listener->certificate) {
+			nopoll_free(listener->certificate);
+			listener->certificate = NULL;
+		}
+		if (listener->private_key) {
+			nopoll_free(listener->private_key);
+			listener->private_key = NULL;
+		}
+		if (listener->chain_certificate) {
+			nopoll_free(listener->chain_certificate);
+			listener->chain_certificate = NULL;
+		}
+		return nopoll_false;
+	}
+
+	memcpy(listener->certificate, certificate, certificate_size);
+	listener->certificate_size = certificate_size;
+	memcpy(listener->private_key, private_key, private_key_size);
+	listener->private_key_size = private_key_size;
+	if (chain_file) {
+		memcpy(listener->chain_certificate, chain_file, chain_file_size);
+		listener->chain_certificate_size = chain_file_size;
+	}
+#else
 	/* check certificate file */
-	handle = fopen (certificate, "r");
+	FILE *handle = fopen (certificate, "r");
 	if (! handle) {
 		nopoll_log (listener->ctx, NOPOLL_LEVEL_CRITICAL, "Failed to open certificate file from %s", certificate);
 		return nopoll_false;
@@ -520,15 +579,16 @@ nopoll_bool           nopoll_listener_set_certificate (noPollConn * listener,
 	listener->private_key   = nopoll_strdup (private_key);
 	if (chain_file)
 		listener->chain_certificate = nopoll_strdup (chain_file);
-	    
+
 	nopoll_log (listener->ctx, NOPOLL_LEVEL_DEBUG, "Configured certificate: %s, key: %s, for conn id: %d",
 		    listener->certificate, listener->private_key, listener->id);
-
+#endif
 	/* certificates configured */
 	return nopoll_true;
 }
 
-/** 
+
+/**
  * @brief Creates a websocket listener from the socket provided.
  *
  * @param ctx The context where the listener will be associated.
@@ -552,7 +612,7 @@ noPollConn   * nopoll_listener_from_socket (noPollCtx      * ctx,
 #endif
 
 	nopoll_return_val_if_fail (ctx, ctx && session > 0, NULL);
-	
+
 	/* create noPollConn ection object */
 	listener            = nopoll_new (noPollConn, 1);
 	listener->refs      = 1;
@@ -591,12 +651,12 @@ noPollConn   * nopoll_listener_from_socket (noPollCtx      * ctx,
 
 	/* reduce reference counting here because ctx_register_conn
 	 * already acquired a reference */
-	nopoll_conn_unref (listener); 
-	
+	nopoll_conn_unref (listener);
+
 	return listener;
 }
 
-/** 
+/**
  * @internal Public function that performs a TCP listener accept.
  *
  * @param server_socket The listener socket where the accept()

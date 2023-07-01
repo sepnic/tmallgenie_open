@@ -16,7 +16,7 @@
  *  License along with this program; if not, write to the Free
  *  Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
- *  
+ *
  *  You may find a copy of the license under this software is released
  *  at COPYING file. This is LGPL software: you are welcome to develop
  *  proprietary applications using this library without any royalty or
@@ -25,7 +25,7 @@
  *
  *  For commercial support on build Websocket enabled solutions
  *  contact us:
- *          
+ *
  *      Postal address:
  *         Advanced Software Production Line, S.L.
  *         Av. Juan Carlos I, Nº13, 2ºC
@@ -35,25 +35,39 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
-#include <nopoll.h>
-#include <nopoll_private.h>
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
+#include "nopoll.h"
+#include "nopoll_private.h"
+#include "nopoll_log.h"
 
-/** 
+#if defined(NOPOLL_HAVE_SYSUTILS_ENABLED)
+#define NOPOLL_LOG_BUFFER_SIZE 1024
+#endif
+
+/**
  * \defgroup nopoll_log noPoll Log: Console log reporting for noPoll library
  */
 
-/** 
+/**
  * \addtogroup nopoll_log
  * @{
  */
 
-/** 
+/**
  * @brief Allows to check if the log reporting inside the system is
  * enabled.
  *
  * @return nopoll_true if the log is enabled or nopoll_false
  */
-nopoll_bool      nopoll_log_is_enabled (noPollCtx * ctx) 
+nopoll_bool      nopoll_log_is_enabled (noPollCtx * ctx)
 {
 	if (ctx == NULL)
 		return nopoll_false;
@@ -62,10 +76,10 @@ nopoll_bool      nopoll_log_is_enabled (noPollCtx * ctx)
 	return ctx->debug_enabled;
 }
 
-/** 
+/**
  *
  * @brief Allows to get current log configuration, to use colors.
- * 
+ *
  * @return nopoll_true if the color log is enabled or nopoll_false
  */
 nopoll_bool    nopoll_log_color_is_enabled (noPollCtx * ctx)
@@ -73,17 +87,17 @@ nopoll_bool    nopoll_log_color_is_enabled (noPollCtx * ctx)
 
 	if (ctx == NULL)
 		return nopoll_false;
-	
+
 	/* return current value */
 	return ctx->debug_color_enabled;
 }
 
-/** 
+/**
  * @brief Allows to control how to activate the log reporting to the
  * console from the nopoll core library.
  *
  * @param ctx The context where the operation will take place.
- * 
+ *
  * @param value nopoll_true to enable log to console, otherwise nopoll_false is
  * returned.
  */
@@ -97,12 +111,12 @@ void     nopoll_log_enable (noPollCtx * ctx, nopoll_bool value)
 	return;
 }
 
-/** 
+/**
  * @brief Allows to control how to activate the colog log reporting to
  * the console from the nopoll core library.
  *
  * @param ctx The context where the operation will take place.
- * 
+ *
  * @param value nopoll_true to enable log to console, otherwise nopoll_false is
  * returned.
  */
@@ -116,7 +130,7 @@ void     nopoll_log_color_enable (noPollCtx * ctx, nopoll_bool value)
 	return;
 }
 
-/** 
+/**
  * @brief Allows to define a log handler that will receive all logs
  * produced under the provided content.
  *
@@ -139,17 +153,31 @@ void            nopoll_log_set_handler (noPollCtx * ctx, noPollLogHandler handle
 	return;
 }
 
-/** 
+#if defined(NOPOLL_HAVE_SYSUTILS_ENABLED)
+static  char * __nopoll_log_trim_filename (char *filepath)
+{
+	char * filename = NULL;
+	filename = strrchr(filepath, '\\');
+	if (filename != NULL)
+		return (char *)(filename + 1);
+	filename = strrchr(filepath, '/');
+	if (filename != NULL)
+		return (char *)(filename + 1);
+	return filepath;
+}
+#endif
+
+/**
  * @internal Allows to drop a log to the console.
  *
  * This function allow to drop a log to the console using the given
  * domain, as an identification of which subsystem have reported the
  * information, and report level. This report level is used to notify
  * the consideration of the log reported.
- * 
+ *
  * The function allows to provide a printf like interface to report
  * messages. Here are some examples:
- * 
+ *
  * \code
  * // drop a log about current library initialization
  * nopoll_log (ctx, NOPOLL_LEVEL_DEBUG, "library properly initialized status=%d", status);
@@ -158,15 +186,13 @@ void            nopoll_log_set_handler (noPollCtx * ctx, noPollLogHandler handle
  *
  * @param ctx The context where the operation will take place.
  *
- * @param level The level that this message is classificed. 
- * 
+ * @param level The level that this message is classificed.
+ *
  * @param message The message to report. The message to report must be
  * not NULL.
  */
 void __nopoll_log (noPollCtx * ctx, const char * function_name, const char * file, int line, noPollDebugLevel level, const char * message, ...)
 {
-
-#ifdef SHOW_DEBUG_LOG
 	va_list      args;
 	char       * log_msg;
 	char       * log_msg2;
@@ -190,8 +216,30 @@ void __nopoll_log (noPollCtx * ctx, const char * function_name, const char * fil
 	if (! nopoll_log_is_enabled (ctx))
 		return;
 
+#if defined(NOPOLL_HAVE_SYSUTILS_ENABLED)
+#define TAG "nopoll"
+	else {
+		char log_buffer[NOPOLL_LOG_BUFFER_SIZE];
+		va_start (args, message);
+		vsnprintf (log_buffer, sizeof(log_buffer), message, args);
+		file = __nopoll_log_trim_filename((char *)file);
+		switch (level) {
+		case NOPOLL_LEVEL_CRITICAL:
+			OS_LOGF (TAG, "%s:%d: %s", file, line, log_buffer);
+			break;
+		case NOPOLL_LEVEL_WARNING:
+			OS_LOGW (TAG, "%s:%d: %s", file, line, log_buffer);
+			break;
+		case NOPOLL_LEVEL_DEBUG:
+		default:
+			OS_LOGD (TAG, "%s:%d: %s", file, line, log_buffer);
+			break;
+		}
+		va_end (args);
+	}
+#else
 	/* printout the process pid */
-	if (nopoll_log_color_is_enabled (ctx)) 
+	if (nopoll_log_color_is_enabled (ctx))
 		printf ("\e[1;36m(proc %d)\e[0m: ", getpid ());
 	else
 		printf ("(proc %d): ", getpid ());
@@ -235,7 +283,7 @@ void __nopoll_log (noPollCtx * ctx, const char * function_name, const char * fil
 
 	/* ensure that the log is droped to the console */
 	fflush (stdout);
-#endif
+#endif // defined(NOPOLL_HAVE_SYSUTILS_ENABLED)
 
 	/* return */
 	return;

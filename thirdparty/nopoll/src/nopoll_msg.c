@@ -16,7 +16,7 @@
  *  License along with this program; if not, write to the Free
  *  Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
- *  
+ *
  *  You may find a copy of the license under this software is released
  *  at COPYING file. This is LGPL software: you are welcome to develop
  *  proprietary applications using this library without any royalty or
@@ -25,7 +25,7 @@
  *
  *  For commercial support on build Websocket enabled solutions
  *  contact us:
- *          
+ *
  *      Postal address:
  *         Advanced Software Production Line, S.L.
  *         Av. Juan Carlos I, Nº13, 2ºC
@@ -35,21 +35,30 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
-#include <nopoll_msg.h>
-#include <nopoll_private.h>
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
+#include "nopoll_msg.h"
+#include "nopoll_private.h"
 
-/** 
+/**
  * \defgroup nopoll_msg noPoll Message: functions for handling and using noPoll messages (websocket messages)
  */
 
-/** 
+/**
  * \addtogroup nopoll_msg
  * @{
  */
 
-/** 
+/**
  * @internal function that creates an empty message holder.
- * @return A newly created reference or NULL if it fails. 
+ * @return A newly created reference or NULL if it fails.
  */
 noPollMsg  * nopoll_msg_new (void)
 {
@@ -63,7 +72,7 @@ noPollMsg  * nopoll_msg_new (void)
 	return msg;
 }
 
-/** 
+/**
  * @brief Allows to get a reference to the payload content inside the
  * provided websocket message.
  *
@@ -79,7 +88,7 @@ const unsigned char * nopoll_msg_get_payload (noPollMsg * msg)
 	return msg->payload;
 }
 
-/** 
+/**
  * @brief Allows to get the payload byte length stored on the provided
  * message.
  *
@@ -94,7 +103,7 @@ int          nopoll_msg_get_payload_size (noPollMsg * msg)
 	return msg->payload_size;
 }
 
-/** 
+/**
  * @brief Allows to acquire a reference to the provided websocket
  * message.
  *
@@ -120,7 +129,7 @@ nopoll_bool  nopoll_msg_ref (noPollMsg * msg)
 	return nopoll_true;
 }
 
-/** 
+/**
  * @brief Allows to get current reference counting for the provided
  * message.
  *
@@ -149,13 +158,13 @@ int          nopoll_msg_ref_count (noPollMsg * msg)
 	return result;
 }
 
-/** 
+/**
  * @brief Allows to get if the provided message reference has FIN flag
  * on (or off) to indicate if it is a final frame.
  *
  * When a series of messages are received and they conform together a
  * single message, the last message is flagged with FIN = 1 while the
- * rest before go with FIN = 0. 
+ * rest before go with FIN = 0.
  *
  * For example, if a user level application is splitted into 4 frame
  * fragments, then the WebSocket peer will receive 3 fragments with
@@ -182,7 +191,7 @@ nopoll_bool  nopoll_msg_is_final (noPollMsg * msg)
 	return msg->remain_bytes == 0 && msg->has_fin;
 }
 
-/** 
+/**
  * @brief Allows to check if the message represents a frame fragment.
  *
  * The function allows to check if the provided noPollMsg is a
@@ -205,7 +214,7 @@ nopoll_bool  nopoll_msg_is_fragment (noPollMsg * msg)
 	return msg->is_fragment || msg->has_fin == 0;
 }
 
-/** 
+/**
  * @brief Get message OpCode to get the type of message that was
  * received.
  *
@@ -220,7 +229,7 @@ noPollOpCode nopoll_msg_opcode (noPollMsg * msg)
 	return (noPollOpCode) msg->op_code;
 }
 
-/** 
+/**
  * @brief Allows to join the provided noPollMsg references to create a
  * newly allocated message (or reusing same reference but increasing reference
  * counting) that contains both content.
@@ -231,7 +240,7 @@ noPollOpCode nopoll_msg_opcode (noPollMsg * msg)
  * argument and reference counting will be updated.
  *
  * @param msg2 The message to be join as a second part for the first
- * argument. 
+ * argument.
  *
  * Here are some examples showing how the function works. The notation
  * along the argument indicates the reference counting at the end of
@@ -260,7 +269,7 @@ noPollMsg  * nopoll_msg_join (noPollMsg * msg, noPollMsg * msg2)
 		nopoll_msg_ref (msg);
 		return msg;
 	} /* end if */
-	
+
 	/* now, join content */
 	result            = nopoll_msg_new ();
 	result->has_fin   = msg->has_fin;
@@ -283,7 +292,7 @@ noPollMsg  * nopoll_msg_join (noPollMsg * msg, noPollMsg * msg2)
 	return result;
 }
 
-/** 
+/**
  * @brief Allows to release the reference acquired, finished the
  * object if all references are terminated.
  *
@@ -293,7 +302,7 @@ void         nopoll_msg_unref (noPollMsg * msg)
 {
 	if (msg == NULL)
 		return;
-	
+
 	/* acquire mutex here */
 	nopoll_mutex_lock (msg->ref_mutex);
 

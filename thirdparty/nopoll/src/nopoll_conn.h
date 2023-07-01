@@ -16,7 +16,7 @@
  *  License along with this program; if not, write to the Free
  *  Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
- *  
+ *
  *  You may find a copy of the license under this software is released
  *  at COPYING file. This is LGPL software: you are welcome to develop
  *  proprietary applications using this library without any royalty or
@@ -25,7 +25,7 @@
  *
  *  For commercial support on build Websocket enabled solutions
  *  contact us:
- *          
+ *
  *      Postal address:
  *         Advanced Software Production Line, S.L.
  *         Av. Juan Carlos I, Nº13, 2ºC
@@ -35,36 +35,47 @@
  *      Email address:
  *         info@aspl.es - http://www.aspl.es/nopoll
  */
+// Copyright (c) 2021-2022 Qinglong<sysu.zqlong@gmail.com>
+// History:
+//  1. Add mbedtls support, you should define 'NOPOLL_HAVE_MBEDTLS_ENABLED'
+//     if using mbedtls instead of openssl
+//  2. Add macro 'NOPOLL_HAVE_IPV6_ENABLED', define it if ipv6 supported,
+//     otherwise remove it
+//  3. Add sysutils support, because sysutils has osal layer, we don't need
+//     to care about platform dependent
+//  4. Add lwip support
 #ifndef __NOPOLL_CONN_H__
 #define __NOPOLL_CONN_H__
 
-#include <nopoll.h>
+#include "nopoll_namespace.h"
+#include "nopoll.h"
 
 BEGIN_C_DECLS
 
 noPollConn * nopoll_conn_new (noPollCtx  * ctx,
-			      const char * host_ip, 
-			      const char * host_port, 
+			      const char * host_ip,
+			      const char * host_port,
 			      const char * host_name,
-			      const char * get_url, 
+			      const char * get_url,
 			      const char * protocols,
 			      const char * origin);
 
+#if defined(NOPOLL_HAVE_IPV6_ENABLED)
 noPollConn * nopoll_conn_new6 (noPollCtx  * ctx,
-			       const char * host_ip, 
-			       const char * host_port, 
+			       const char * host_ip,
+			       const char * host_port,
 			       const char * host_name,
-			       const char * get_url, 
+			       const char * get_url,
 			       const char * protocols,
 			       const char * origin);
-
+#endif
 
 noPollConn * nopoll_conn_new_opts (noPollCtx       * ctx,
 				   noPollConnOpts  * opts,
-				   const char      * host_ip, 
-				   const char      * host_port, 
+				   const char      * host_ip,
+				   const char      * host_port,
 				   const char      * host_name,
-				   const char      * get_url, 
+				   const char      * get_url,
 				   const char      * protocols,
 				   const char      * origin);
 
@@ -80,21 +91,23 @@ noPollConn * nopoll_conn_new_with_socket (noPollCtx  * ctx,
 
 noPollConn * nopoll_conn_tls_new (noPollCtx  * ctx,
 				  noPollConnOpts * options,
-				  const char * host_ip, 
-				  const char * host_port, 
+				  const char * host_ip,
+				  const char * host_port,
 				  const char * host_name,
-				  const char * get_url, 
+				  const char * get_url,
 				  const char * protocols,
 				  const char * origin);
 
+#if defined(NOPOLL_HAVE_IPV6_ENABLED)
 noPollConn * nopoll_conn_tls_new6 (noPollCtx  * ctx,
 				   noPollConnOpts * options,
-				   const char * host_ip, 
-				   const char * host_port, 
+				   const char * host_ip,
+				   const char * host_port,
 				   const char * host_name,
-				   const char * get_url, 
+				   const char * get_url,
 				   const char * protocols,
 				   const char * origin);
+#endif
 
 noPollConn * nopoll_conn_tls_new_with_socket (noPollCtx  * ctx,
 				  noPollConnOpts * options,
@@ -110,9 +123,9 @@ noPollConn   * nopoll_conn_accept (noPollCtx * ctx, noPollConn * listener);
 
 noPollConn   * nopoll_conn_accept_socket (noPollCtx * ctx, noPollConn * listener, NOPOLL_SOCKET session);
 
-nopoll_bool    nopoll_conn_accept_complete (noPollCtx      * ctx, 
-					    noPollConn     * listener, 
-					    noPollConn     * conn, 
+nopoll_bool    nopoll_conn_accept_complete (noPollCtx      * ctx,
+					    noPollConn     * listener,
+					    noPollConn     * conn,
 					    NOPOLL_SOCKET    session,
 					    nopoll_bool      tls_on);
 
@@ -215,10 +228,10 @@ int nopoll_conn_send_frame (noPollConn * conn, nopoll_bool fin, nopoll_bool mask
 			    noPollOpCode op_code, long length, noPollPtr content,
 			    long sleep_in_header);
 
-int           __nopoll_conn_send_common (noPollConn * conn, 
-					 const char * content, 
-					 long         length, 
-					 nopoll_bool  has_fin, 
+int           __nopoll_conn_send_common (noPollConn * conn,
+					 const char * content,
+					 long         length,
+					 nopoll_bool  has_fin,
 					 long         sleep_in_header,
 					 noPollOpCode frame_type);
 
