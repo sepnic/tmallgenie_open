@@ -58,7 +58,7 @@
 0.start keyword detect,    7.start vad detect,
   waiting sound trigger      waiting micphone silence
 ```
-- Genie Interaction Service：端云交互中心，包括服务端对接、账户激活鉴权、网关协议解析、设备状态机，这部分代码不公开
+- Genie Interaction Service：端云交互中心，包括服务端对接、账户激活鉴权、网关协议解析、设备状态机，见 https://github.com/sepnic/tmallgenie_open/tree/main/src/core （注：精灵协议不开源）
 - Genie Recorder：录音器，负责录音和语音压缩上传，见 https://github.com/sepnic/tmallgenie_open/tree/main/src/recorder
 - Genie Player：播放控制及播放器，见 https://github.com/sepnic/tmallgenie_open/tree/main/src/player
 - Vendor Voice Engine：平台层的语音引擎，负责回音消除、噪音抑制、语音唤醒、VAD 语句判停等处理，MacOSX/Ubuntu 平台这方面的实现见 https://github.com/sepnic/tmallgenie_open/tree/main/adapter/portaudio
