@@ -22,7 +22,7 @@ export IDF_TOOLS_PATH="<YOUR IDF TOOLS PATH>"
 ### Build the project
 
 ``` bash
-idf.py menuconfig                # config your wifi ssid and password, audio board
+idf.py menuconfig                # config your wifi ssid&password, audio board
 idf.py build                     # build
 idf.py -p <PORT> flash monitor   # flash image and monitor serial message
 ```

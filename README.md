@@ -84,7 +84,7 @@ player 包含两部分，分别是播控系统（UTPManager）和播放器（Lit
 | [nopoll](https://github.com/ASPLes/nopoll) | ASPLes | LGPL-2.1 | websocket 通讯协议轻量级实现 |
 | [speex](https://github.com/xiph/speex) | xiph | FreeBSD | 语音压缩和编码 |
 | [pvmp3](http://androidxref.com/4.4_r1/xref/frameworks/av/media/libstagefright/codecs/mp3dec/src/) & [pvaac](http://androidxref.com/2.2.3/xref/frameworks/base/media/libstagefright/codecs/aacdec/) | PacketVideo | Apache-2.0 | mp3 & aac 音频解码库 |
-| [liteplayer](https://github.com/sepnic/liteplayer_open) | 本人(Qinglong) | Apache-2.0 | 轻量级音频播放器 |
+| [liteplayer](https://github.com/sepnic/liteplayer) | 本人(Qinglong) | Apache-2.0 | 轻量级音频播放器 |
 | [litevad](https://github.com/sepnic/litevad) | 本人(Qinglong) | Apache-2.0 | 语句结束检测，依赖 webrtc VAD 模块 |
 | [snowboy](https://github.com/Kitt-AI/snowboy) | KITT.AI | Apache-2.0 | 语音热词检测，即语音唤醒 |
 | [portaudio](https://github.com/PortAudio/portaudio) | PortAudio | FreeBSD | 跨平台的音频 I/O 库 |

@@ -12,8 +12,8 @@ set(SPEEX_DIR           "${TOP_DIR}/thirdparty/speex")
 set(TMALLGENIE_DIR      "${TOP_DIR}")
 
 # cflags: compile paramters
-set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -std=gnu99 -Wall -Werror")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror")
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -std=gnu99 -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 
 # include files
 include_directories(${TMALLGENIE_DIR}/include)
@@ -22,6 +22,42 @@ include_directories(${MBEDTLS_DIR}/include)
 include_directories(${NOPOLL_DIR}/src)
 include_directories(${LITEPLAYER_DIR}/include)
 include_directories(${SPEEX_DIR}/include)
+
+# liteplayer_core files
+file(GLOB LITEPLAYER_CODEC_SRC src
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/src/*.cpp
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvaac/*.cpp)
+set(LITEPLAYER_SRC
+    ${LITEPLAYER_CODEC_SRC}
+    ${LITEPLAYER_DIR}/src/esp_adf/audio_element.c
+    ${LITEPLAYER_DIR}/src/esp_adf/audio_event_iface.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/mp3_pvmp3_wrapper.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/mp3_decoder.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/aac_pvaac_wrapper.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/aac_decoder.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/m4a_decoder.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/wav_decoder.c
+    ${LITEPLAYER_DIR}/src/audio_extractor/mp3_extractor.c
+    ${LITEPLAYER_DIR}/src/audio_extractor/aac_extractor.c
+    ${LITEPLAYER_DIR}/src/audio_extractor/m4a_extractor.c
+    ${LITEPLAYER_DIR}/src/audio_extractor/wav_extractor.c
+    ${LITEPLAYER_DIR}/src/liteplayer_adapter.c
+    ${LITEPLAYER_DIR}/src/liteplayer_source.c
+    ${LITEPLAYER_DIR}/src/liteplayer_parser.c
+    ${LITEPLAYER_DIR}/src/liteplayer_main.c
+    ${LITEPLAYER_DIR}/src/liteplayer_listplayer.c
+    ${LITEPLAYER_DIR}/src/liteplayer_ttsplayer.c)
+add_library(liteplayer_core STATIC ${LITEPLAYER_SRC})
+target_compile_options(liteplayer_core PRIVATE
+    -Wno-error=narrowing
+    -DLITEPLAYER_CONFIG_SINK_FIXED_S16LE -DLITEPLAYER_CONFIG_AAC_SBR
+    -DOSCL_IMPORT_REF= -DOSCL_EXPORT_REF= -DOSCL_UNUSED_ARG=\(void\))
+target_include_directories(liteplayer_core PRIVATE
+    ${LITEPLAYER_DIR}/thirdparty/codecs
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/include
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/src
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvaac
+    ${LITEPLAYER_DIR}/src)
 
 # tmallgenie_open files
 set(TMALLGENIE_OPEN_SRC
@@ -82,10 +118,6 @@ file(GLOB SPEEX_SRC src ${SPEEX_DIR}/libspeex/*.c ${SPEEX_DIR}/libogg/*.c)
 add_library(speex STATIC ${SPEEX_SRC})
 target_compile_options(speex PRIVATE
     -DFIXED_POINT -DUSE_KISS_FFT -DEXPORT= -DSPEEX_HAVE_SYSUTILS_ENABLED)
-
-# liteplayer_core
-add_library(liteplayer_core STATIC IMPORTED)
-set_target_properties(liteplayer_core PROPERTIES IMPORTED_LOCATION "${LITEPLAYER_DIR}/lib/android/${ANDROID_ABI}/libliteplayer_core.a")
 
 # tmallgenie_core
 add_library(tmallgenie_core STATIC IMPORTED)

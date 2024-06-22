@@ -147,6 +147,7 @@ fail_open:
 int alsa_wrapper_write(sink_handle_t handle, char *buffer, int size)
 {
     struct alsa_wrapper *alsa = (struct alsa_wrapper *)handle;
+
     size_t frame_count = (size_t)(size * 8 / alsa->bits_per_frame);
     unsigned char *data = (unsigned char *)buffer;
     ssize_t ret;
@@ -176,8 +177,10 @@ void alsa_wrapper_close(sink_handle_t handle)
 {
     OS_LOGD(TAG, "closing alsa");
     struct alsa_wrapper *alsa = (struct alsa_wrapper *)handle;
+
     snd_output_close(alsa->log);
     snd_pcm_drain(alsa->pcm);
     snd_pcm_close(alsa->pcm);
+
     OS_FREE(alsa);
 }

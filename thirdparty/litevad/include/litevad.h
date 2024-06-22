@@ -22,11 +22,12 @@ extern "C" {
 #endif
 
 typedef enum {
-    LITEVAD_RESULT_ERROR = -1,
-    LITEVAD_RESULT_FRAME_SILENCE = 0,
-    LITEVAD_RESULT_FRAME_ACTIVE = 1,
-    LITEVAD_RESULT_SPEECH_BEGIN = 2,
-    LITEVAD_RESULT_SPEECH_END = 3,
+    LITEVAD_RESULT_ERROR                = -1,
+    LITEVAD_RESULT_FRAME_SILENCE        = 0,
+    LITEVAD_RESULT_FRAME_ACTIVE         = 1,
+    LITEVAD_RESULT_SPEECH_BEGIN         = 2,
+    LITEVAD_RESULT_SPEECH_END           = 3,
+    LITEVAD_RESULT_SPEECH_BEGIN_AND_END = 4,
 } litevad_result_t;
 
 typedef void *litevad_handle_t;

@@ -25,16 +25,13 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     if(${UNAME_OUTPUT} MATCHES "raspberrypi")
         if(${UNAME_OUTPUT} MATCHES "aarch64")
             link_directories(${SNOWBOY_DIR}/lib/aarch64-ubuntu1604)
-            link_directories(${LITEPLAYER_DIR}/lib/aarch64-ubuntu)
             link_directories(${TOP_DIR}/lib/aarch64-ubuntu)
         else()
             link_directories(${SNOWBOY_DIR}/lib/rpi)
-            link_directories(${LITEPLAYER_DIR}/lib/rpi)
             link_directories(${TOP_DIR}/lib/rpi)
         endif()
     elseif(${UNAME_OUTPUT} MATCHES "x86_64")
         link_directories(${SNOWBOY_DIR}/lib/ubuntu64)
-        link_directories(${LITEPLAYER_DIR}/lib/ubuntu64)
         link_directories(${TOP_DIR}/lib/ubuntu64)
     else()
         message(FATAL_ERROR "Neither raspberrypi nor x86_64, abort....")
@@ -44,7 +41,6 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -DOS_APPLE")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DOS_APPLE")
     link_directories(${SNOWBOY_DIR}/lib/osx)
-    link_directories(${LITEPLAYER_DIR}/lib/macosx)
     link_directories(${TOP_DIR}/lib/macosx)
 else()
     message(FATAL_ERROR "Neither Linux nor Macos, abort....")
@@ -112,6 +108,42 @@ set(NOPOLL_SRC
 add_library(nopoll STATIC ${NOPOLL_SRC})
 target_compile_options(nopoll PRIVATE
     -DNOPOLL_HAVE_SYSUTILS_ENABLED -DNOPOLL_HAVE_MBEDTLS_ENABLED)
+
+# liteplayer files
+file(GLOB LITEPLAYER_CODEC_SRC src
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/src/*.cpp
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvaac/*.cpp)
+set(LITEPLAYER_SRC
+    ${LITEPLAYER_CODEC_SRC}
+    ${LITEPLAYER_DIR}/src/esp_adf/audio_element.c
+    ${LITEPLAYER_DIR}/src/esp_adf/audio_event_iface.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/mp3_pvmp3_wrapper.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/mp3_decoder.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/aac_pvaac_wrapper.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/aac_decoder.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/m4a_decoder.c
+    ${LITEPLAYER_DIR}/src/audio_decoder/wav_decoder.c
+    ${LITEPLAYER_DIR}/src/audio_extractor/mp3_extractor.c
+    ${LITEPLAYER_DIR}/src/audio_extractor/aac_extractor.c
+    ${LITEPLAYER_DIR}/src/audio_extractor/m4a_extractor.c
+    ${LITEPLAYER_DIR}/src/audio_extractor/wav_extractor.c
+    ${LITEPLAYER_DIR}/src/liteplayer_adapter.c
+    ${LITEPLAYER_DIR}/src/liteplayer_source.c
+    ${LITEPLAYER_DIR}/src/liteplayer_parser.c
+    ${LITEPLAYER_DIR}/src/liteplayer_main.c
+    ${LITEPLAYER_DIR}/src/liteplayer_listplayer.c
+    ${LITEPLAYER_DIR}/src/liteplayer_ttsplayer.c)
+add_library(liteplayer_core STATIC ${LITEPLAYER_SRC})
+target_compile_options(liteplayer_core PRIVATE
+    -Wno-error=narrowing
+    -DLITEPLAYER_CONFIG_SINK_FIXED_S16LE
+    -DOSCL_IMPORT_REF= -DOSCL_EXPORT_REF= -DOSCL_UNUSED_ARG=)
+target_include_directories(liteplayer_core PRIVATE
+    ${LITEPLAYER_DIR}/thirdparty/codecs
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/include
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/src
+    ${LITEPLAYER_DIR}/thirdparty/codecs/pvaac
+    ${LITEPLAYER_DIR}/src)
 
 # litevad files
 set(LITEVAD_SRC

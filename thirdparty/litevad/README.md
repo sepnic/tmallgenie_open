@@ -31,21 +31,22 @@ litevad 是一个基于 webrtc 的轻量级 VAD 模块，采用简单的算法�
 #define DEFAULT_VAD_MODE           3
 ```
 
-android/demo 是一个 android 上的使用范例，AudioReecorder 的录音数据送到 litevad 处理，返回如下事件：
+example/android 是一个 android 上的使用范例，AudioReecorder 的录音数据送到 litevad 处理，返回如下事件：
 ``` c
-LITEVAD_RESULT_ERROR = -1,         // 错误，一般是传入的音频帧数不是 10ms/20ms/30ms 的整数倍导致的
-LITEVAD_RESULT_FRAME_SILENCE = 0,  // 当前数据判断是静音帧
-LITEVAD_RESULT_FRAME_ACTIVE = 1,   // 当前数据判断是语音帧
-LITEVAD_RESULT_SPEECH_BEGIN = 2,   // 满足语句开始条件
-LITEVAD_RESULT_SPEECH_END = 3,     // 满足语句结束条件
+LITEVAD_RESULT_ERROR                = -1, // 错误，一般是传入的音频帧数不是 10ms/20ms/30ms 的整数倍导致的
+LITEVAD_RESULT_FRAME_SILENCE        = 0,  // 当前数据判断是静音帧
+LITEVAD_RESULT_FRAME_ACTIVE         = 1,  // 当前数据判断是语音帧
+LITEVAD_RESULT_SPEECH_BEGIN         = 2,  // 当前数据满足语句开始条件
+LITEVAD_RESULT_SPEECH_END           = 3,  // 当前数据满足语句结束条件
+LITEVAD_RESULT_SPEECH_BEGIN_AND_END = 4,  // 当前数据包含一段完整语句
 ```
 
 确保帧数合法，请参考如下代码：
-``` c
+``` java
 int sampleRate = 16000;
 int channelConfig = AudioFormat.CHANNEL_IN_MONO;
 int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
-int bytesPer10Ms = sampleRate/100*2;
+int bytesPer10Ms = (sampleRate/1000)*1*(16/8)*10;
 int bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat);
 bufferSize = (bufferSize/bytesPer10Ms + 1) * bytesPer10Ms; // 确保读取的音频帧数为 10ms 的整数倍
 mAudioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfig, audioFormat, bufferSize);

@@ -1,22 +1,23 @@
 cmake_minimum_required(VERSION 2.8)
 project(liteplayer_demo)
 
-set(TOP_DIR "${CMAKE_SOURCE_DIR}/../..")
-
 MESSAGE(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     option(HAVE_LINUX_ALSA_ENABLED "HAVE LINUX ALSA ENABLED" "ON")
-    link_directories(${TOP_DIR}/lib/ubuntu64)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     option(HAVE_PORT_AUDIO_ENABLED "HAVE PORT AUDIO ENABLED" "ON")
-    link_directories(${TOP_DIR}/lib/macosx)
 endif()
+
+set(TOP_DIR "${CMAKE_SOURCE_DIR}/../..")
 
 # cflags: OS_LINUX, OS_ANDROID, OS_APPLE, OS_RTOS
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -DOS_APPLE")
 
-set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -std=gnu99 -Wall")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -O3 -fPIC -std=gnu99 -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -std=c++11 -Wall")
+
+#set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -DSYSUTILS_HAVE_MEMORY_LEAK_DETECT_ENABLED")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSYSUTILS_HAVE_MEMORY_LEAK_DETECT_ENABLED")
 
 # include files
 include_directories(${TOP_DIR}/thirdparty/sysutils/include)
@@ -41,6 +42,48 @@ set(SYSUTILS_SRC
 add_library(sysutils STATIC ${SYSUTILS_SRC})
 target_compile_options(sysutils PRIVATE -DSYSUTILS_HAVE_MBEDTLS_ENABLED)
 target_include_directories(sysutils PRIVATE ${TOP_DIR}/thirdparty/mbedtls/include)
+
+# liteplayer files
+file(GLOB LITEPLAYER_CODEC_SRC src
+    ${TOP_DIR}/thirdparty/codecs/pvmp3/src/*.cpp
+    ${TOP_DIR}/thirdparty/codecs/pvaac/*.cpp
+)
+set(LITEPLAYER_CORE_SRC
+    ${LITEPLAYER_CODEC_SRC}
+    ${TOP_DIR}/src/esp_adf/audio_element.c
+    ${TOP_DIR}/src/esp_adf/audio_event_iface.c
+    ${TOP_DIR}/src/audio_decoder/mp3_pvmp3_wrapper.c
+    ${TOP_DIR}/src/audio_decoder/mp3_decoder.c
+    ${TOP_DIR}/src/audio_decoder/aac_pvaac_wrapper.c
+    ${TOP_DIR}/src/audio_decoder/aac_decoder.c
+    ${TOP_DIR}/src/audio_decoder/m4a_decoder.c
+    ${TOP_DIR}/src/audio_decoder/wav_decoder.c
+    ${TOP_DIR}/src/audio_extractor/mp3_extractor.c
+    ${TOP_DIR}/src/audio_extractor/aac_extractor.c
+    ${TOP_DIR}/src/audio_extractor/m4a_extractor.c
+    ${TOP_DIR}/src/audio_extractor/wav_extractor.c
+    ${TOP_DIR}/src/liteplayer_adapter.c
+    ${TOP_DIR}/src/liteplayer_source.c
+    ${TOP_DIR}/src/liteplayer_parser.c
+    ${TOP_DIR}/src/liteplayer_main.c
+    ${TOP_DIR}/src/liteplayer_listplayer.c
+    ${TOP_DIR}/src/liteplayer_ttsplayer.c
+)
+add_library(liteplayer_core STATIC ${LITEPLAYER_CORE_SRC})
+target_compile_options(liteplayer_core PRIVATE
+    -Wno-error=narrowing
+    -D__amd64__
+    -DLITEPLAYER_CONFIG_SINK_FIXED_S16LE
+    -DLITEPLAYER_CONFIG_AAC_SBR
+    -DOSCL_IMPORT_REF= -DOSCL_EXPORT_REF= -DOSCL_UNUSED_ARG=\(void\)
+)
+target_include_directories(liteplayer_core PRIVATE
+    ${TOP_DIR}/thirdparty/codecs
+    ${TOP_DIR}/thirdparty/codecs/pvmp3/include
+    ${TOP_DIR}/thirdparty/codecs/pvmp3/src
+    ${TOP_DIR}/thirdparty/codecs/pvaac
+    ${TOP_DIR}/src
+)
 
 # mbedtls files
 file(GLOB MBEDTLS_SRC src ${TOP_DIR}/thirdparty/mbedtls/library/*.c)
