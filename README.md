@@ -1,5 +1,5 @@
 **tmallgenie_open** 是一个简单易用的、低延时的、低开销的、跨平台的语音助手/智能音箱项目：
-- 简单易用：平台层接入简单，适配 [GenieVendorAdapter](https://github.com/sepnic/tmallgenie_open/blob/master/include/GenieVendorAdapter.h) 接口即可；应用层使用简单，接口见 [GenieSdk](https://github.com/sepnic/tmallgenie_open/blob/master/include/GenieSdk.h)，使用范例见 [GenieMain](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/GenieMain.c)
+- 简单易用：平台层接入简单，适配 [GenieVendorAdapter](https://github.com/sepnic/tmallgenie_open/blob/main/include/GenieVendorAdapter.h) 接口即可；应用层使用简单，接口见 [GenieSdk](https://github.com/sepnic/tmallgenie_open/blob/main/include/GenieSdk.h)，使用范例见 [GenieMain](https://github.com/sepnic/tmallgenie_open/blob/main/example/unix/GenieMain.c)
 - 低延时：从说话结束到服务端响应的时间少于1秒，达到秒回的效果，与阿里官方智能音箱一样的交互体验
 - 低开销：性能和内存开销极低，可以在各类 RTOS 系统上落地，如 ESP32 demo 为例，CPU 主频为 160MHz，堆内存开销 400KB 以内（还包括了 256KB 的音乐播放器缓冲区和 32KB 的 TTS 播放器缓冲区）
 - 跨平台：已适配 MacOSX、Ubuntu、Android、ESP32、Raspberry-pi 平台，后续看需求支持更多的平台
@@ -9,15 +9,15 @@
  - [ESP32 精灵智能音箱](https://www.bilibili.com/video/BV1q34y1C7CA)
  - Android 精灵语音助手截图：点击 Record 开始录音，过程中会自动判断说话完毕并结束录音，如果环境嘈杂不能自动判断，也可以再次点击 Record 手动结束录音；点击 KeywordDetect 启动语音唤醒功能，默认关键词是 "Jarvis"，再次点击 KeywordDetect 停止语音唤醒功能
 
-![GenieAndroidDemo](https://github.com/sepnic/tmallgenie_open/blob/master/GenieAndroidDemo.png)
+![GenieAndroidDemo](https://github.com/sepnic/tmallgenie_open/blob/main/GenieAndroidDemo.png)
 
 **编译运行：**
-- MacOSX/Ubuntu/raspberry-pi：[How to build tmallgenie for macosx/ubuntu/raspberry-pi](https://github.com/sepnic/tmallgenie_open/blob/master/example/unix/README.md)
-- ESP32：[How to build tmallgenie for esp32](https://github.com/sepnic/tmallgenie_open/blob/master/example/esp32/README.md)
-- Android：Android Studio 打开 [example/Android](https://github.com/sepnic/tmallgenie_open/tree/master/example/android)，编译运行，需要 JDK 11
+- MacOSX/Ubuntu/raspberry-pi：[How to build tmallgenie for macosx/ubuntu/raspberry-pi](https://github.com/sepnic/tmallgenie_open/blob/main/example/unix/README.md)
+- ESP32：[How to build tmallgenie for esp32](https://github.com/sepnic/tmallgenie_open/blob/main/example/esp32/README.md)
+- Android：Android Studio 打开 [example/Android](https://github.com/sepnic/tmallgenie_open/tree/main/example/android)，编译运行，需要 JDK 11
 
 ## 精灵整体框架图
-![GenieArchitecture](https://github.com/sepnic/tmallgenie_open/blob/master/GenieArchitecture.png)
+![GenieArchitecture](https://github.com/sepnic/tmallgenie_open/blob/main/GenieArchitecture.png)
 
 左边是阿里精灵服务端，右边是设备端 SDK，两端通过 websocket 协议进行账户激活和鉴权、语音交互，另外设备端需要通过 http 协议下载服务端内容中心的音乐资源。
 
@@ -59,9 +59,9 @@
   waiting sound trigger      waiting micphone silence
 ```
 - Genie Interaction Service：端云交互中心，包括服务端对接、账户激活鉴权、网关协议解析、设备状态机，这部分代码不公开
-- Genie Recorder：录音器，负责录音和语音压缩上传，见 https://github.com/sepnic/tmallgenie_open/tree/master/src/recorder
-- Genie Player：播放控制及播放器，见 https://github.com/sepnic/tmallgenie_open/tree/master/src/player
-- Vendor Voice Engine：平台层的语音引擎，负责回音消除、噪音抑制、语音唤醒、VAD 语句判停等处理，MacOSX/Ubuntu 平台这方面的实现见 https://github.com/sepnic/tmallgenie_open/tree/master/adapter/portaudio
+- Genie Recorder：录音器，负责录音和语音压缩上传，见 https://github.com/sepnic/tmallgenie_open/tree/main/src/recorder
+- Genie Player：播放控制及播放器，见 https://github.com/sepnic/tmallgenie_open/tree/main/src/player
+- Vendor Voice Engine：平台层的语音引擎，负责回音消除、噪音抑制、语音唤醒、VAD 语句判停等处理，MacOSX/Ubuntu 平台这方面的实现见 https://github.com/sepnic/tmallgenie_open/tree/main/adapter/portaudio
 
 Genie Interaction Service 是大管家，接收服务端下发的指令（比如音乐和TTS播放、闹钟和提醒设置、灯效设置、屏幕显示、智能家居控制），接收设备端各个子组件上传的状态、事件、请求（比如网络连接断开事件、语音唤醒事件、语音静音事件、音量调整事件、播放状态、NLU 请求），指令和事件都在这里进行仲裁并决定下一步行动。底下的子组件是相互独立的，各自只与 Genie Interaction Service 交互，这样做的好处是子组件都是独立解耦的，相互之间没有依赖，各自处理好自己分内之事即可。一般来说子组件需要注册一个指令监听者以处理下发的指令，还有调用相关回调函数上传自身的状态和事件。比如 player 需要处理所有与播放相关的指令并上传播放器状态，Vendor Voice Engine 需要上传语音唤醒事件和语音静音事件。
 
