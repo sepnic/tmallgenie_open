@@ -16,11 +16,13 @@ set(COMPONENT_SRCS
     ${TOPDIR}/source/cutils/mlooper.c
     ${TOPDIR}/source/cutils/mqueue.c
     ${TOPDIR}/source/cutils/ringbuf.c
+    ${TOPDIR}/source/cutils/lockfree_ringbuf.c
     ${TOPDIR}/source/cutils/swtimer.c
     ${TOPDIR}/source/cipher/sha2.c
     ${TOPDIR}/source/cipher/hmac_sha2.c
     ${TOPDIR}/source/cipher/md5.c
     ${TOPDIR}/source/cipher/base64.c
+    ${TOPDIR}/source/cipher/aes.c
     ${TOPDIR}/source/httpclient/httpclient.c
 )
 

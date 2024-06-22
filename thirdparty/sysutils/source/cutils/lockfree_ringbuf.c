@@ -18,7 +18,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include "lockfree_ringbuf.h"
+#include "cutils/memory_helper.h"
+#include "cutils/log_helper.h"
+#include "cutils/lockfree_ringbuf.h"
 
 #if defined(__STDC_NO_ATOMICS__)
 // IMPORTANT:
@@ -56,14 +58,14 @@ void *lockfree_ringbuf_create(int size)
 {
     if (size <= 0)
         return NULL;
-    struct lockfree_ringbuf *rb = malloc(sizeof(struct lockfree_ringbuf));
+    struct lockfree_ringbuf *rb = OS_MALLOC(sizeof(struct lockfree_ringbuf));
     if (rb == NULL)
         return NULL;
     rb->buffer_size = size;
     ATOMIC_INIT(rb->filled_size, 0);
-    rb->p_o = rb->p_r = rb->p_w = malloc(size);
+    rb->p_o = rb->p_r = rb->p_w = OS_MALLOC(size);
     if (rb->p_o == NULL) {
-        free(rb);
+        OS_FREE(rb);
         rb = NULL;
     }
     return rb;
@@ -75,8 +77,8 @@ void lockfree_ringbuf_destroy(void *handle)
     if (rb == NULL)
         return;
     if (rb->p_o != NULL)
-        free(rb->p_o);
-    free(rb);
+        OS_FREE(rb->p_o);
+    OS_FREE(rb);
 }
 
 int lockfree_ringbuf_get_size(void *handle)

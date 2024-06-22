@@ -90,6 +90,7 @@ set(SYSUTILS_SRC
     ${SYSUTILS_DIR}/source/cutils/mlooper.c
     ${SYSUTILS_DIR}/source/cutils/mqueue.c
     ${SYSUTILS_DIR}/source/cutils/ringbuf.c
+    ${SYSUTILS_DIR}/source/cutils/lockfree_ringbuf.c
     ${SYSUTILS_DIR}/source/httpclient/httpclient.c
     ${SYSUTILS_DIR}/source/json/cJSON.c
     ${SYSUTILS_DIR}/source/json/cJSON_Utils.c)
@@ -127,8 +128,7 @@ set_target_properties(tmallgenie_core PROPERTIES IMPORTED_LOCATION "${TMALLGENIE
 set(JNI_SRC
     tmallgenie-jni.cpp
     GenieVendor_Android.cpp
-    GenieVoiceEngine_Android.cpp
-    lockfree_ringbuf.c)
+    GenieVoiceEngine_Android.cpp)
 add_library(tmallgenie-jni SHARED ${JNI_SRC})
 target_link_libraries(tmallgenie-jni
     tmallgenie_open tmallgenie_core liteplayer_core nopoll speex sysutils mbedtls

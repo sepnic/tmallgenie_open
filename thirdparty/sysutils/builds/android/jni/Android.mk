@@ -15,11 +15,13 @@ LOCAL_SRC_FILES := \
     ${TOP_DIR}/source/cutils/mlooper.c \
     ${TOP_DIR}/source/cutils/mqueue.c \
     ${TOP_DIR}/source/cutils/ringbuf.c \
+    ${TOP_DIR}/source/cutils/lockfree_ringbuf.c \
     ${TOP_DIR}/source/cutils/swtimer.c \
     ${TOP_DIR}/source/cipher/sha2.c \
     ${TOP_DIR}/source/cipher/hmac_sha2.c \
     ${TOP_DIR}/source/cipher/md5.c \
     ${TOP_DIR}/source/cipher/base64.c \
+    ${TOP_DIR}/source/cipher/aes.c \
     ${TOP_DIR}/source/httpclient/httpclient.c \
     ${TOP_DIR}/source/json/cJSON.c \
     ${TOP_DIR}/source/json/cJSON_Utils.c \

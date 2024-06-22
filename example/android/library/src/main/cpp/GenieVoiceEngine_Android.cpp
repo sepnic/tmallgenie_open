@@ -21,7 +21,7 @@
 #include <SLES/OpenSLES_Android.h>
 #include <android/log.h>
 
-#include "lockfree_ringbuf.h"
+#include "cutils/lockfree_ringbuf.h"
 #include "GenieSdk.h"
 #include "GenieVendor_Android.h"
 
