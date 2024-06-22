@@ -57,8 +57,16 @@ include_directories(${SPEEX_DIR}/include)
 include_directories(${SNOWBOY_DIR}/include)
 
 # cflags: OS_LINUX, OS_ANDROID, OS_APPLE, OS_RTOS
-set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -Wall -std=gnu99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -O3 -fPIC -Wall -std=gnu99")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -Wall -std=c++11")
+
+# cflags: check memory leak
+#set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -DSYSUTILS_HAVE_MEMORY_LEAK_DETECT_ENABLED")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSYSUTILS_HAVE_MEMORY_LEAK_DETECT_ENABLED")
+
+# cflags: enable verbose log
+#set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -DSYSUTILS_HAVE_VERBOSE_LOG_ENABLED")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSYSUTILS_HAVE_VERBOSE_LOG_ENABLED")
 
 # genie open files
 set(TMALLGENIE_OPEN_SRC
