@@ -72,6 +72,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -Wall -std=c++11")
 set(TMALLGENIE_OPEN_SRC
     ${LITEPLAYER_DIR}/adapter/source_httpclient_wrapper.c
     ${LITEPLAYER_DIR}/adapter/source_file_wrapper.c
+    ${TOP_DIR}/src/core/GenieService.c
     ${TOP_DIR}/src/player/GenieUtpManager.c
     ${TOP_DIR}/src/player/GeniePlayer.c
     ${TOP_DIR}/src/player/vendorplayer/GenieVendorPlayer.c
@@ -93,7 +94,7 @@ set(SYSUTILS_SRC
     ${SYSUTILS_DIR}/source/cutils/mlooper.c
     ${SYSUTILS_DIR}/source/cutils/mqueue.c
     ${SYSUTILS_DIR}/source/cutils/ringbuf.c
-    ${SYSUTILS_DIR}/source/cutils/swtimer.c
+    ${SYSUTILS_DIR}/source/cutils/lockfree_ringbuf.c
     ${SYSUTILS_DIR}/source/httpclient/httpclient.c
     ${SYSUTILS_DIR}/source/json/cJSON.c
     ${SYSUTILS_DIR}/source/json/cJSON_Utils.c)
@@ -250,6 +251,6 @@ endif()
 add_executable(GenieMain ${CMAKE_SOURCE_DIR}/GenieMain.c ${TMALLGENIE_ADAPTER_SRC})
 target_include_directories(GenieMain PRIVATE ${TOP_DIR}/adapter)
 target_link_libraries(GenieMain
-    tmallgenie_open tmallgenie_core
+    tmallgenie_open tmallgenie_protocol
     liteplayer_core nopoll litevad speex sysutils pthread
     ${MBEDTLS_LIBS} ${PLATFORM_LIBS})
