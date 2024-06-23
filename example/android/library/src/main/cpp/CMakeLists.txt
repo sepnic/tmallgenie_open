@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.5)
 project(tmallgenie_demo)
 
-option(ENABLE_LITEVAD_SPEECH_DETECT  "Enable litevad speech detect"  "ON")
+option(ENABLE_LITEVAD_SPEECH_DETECT "Enable litevad speech detect" "ON")
 
 set(TOP_DIR             "${CMAKE_SOURCE_DIR}/../../../../../..")
 set(SYSUTILS_DIR        "${TOP_DIR}/thirdparty/sysutils")
@@ -20,10 +20,10 @@ include_directories(${TMALLGENIE_DIR}/include)
 include_directories(${SYSUTILS_DIR}/include)
 include_directories(${MBEDTLS_DIR}/include)
 include_directories(${NOPOLL_DIR}/src)
-include_directories(${LITEPLAYER_DIR}/include)
+include_directories(${LITEPLAYER_DIR}/include ${LITEPLAYER_DIR}/adapter)
 include_directories(${SPEEX_DIR}/include)
 
-# liteplayer_core files
+# liteplayer files
 file(GLOB LITEPLAYER_CODEC_SRC src
     ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/src/*.cpp
     ${LITEPLAYER_DIR}/thirdparty/codecs/pvaac/*.cpp)
@@ -46,13 +46,15 @@ set(LITEPLAYER_SRC
     ${LITEPLAYER_DIR}/src/liteplayer_parser.c
     ${LITEPLAYER_DIR}/src/liteplayer_main.c
     ${LITEPLAYER_DIR}/src/liteplayer_listplayer.c
-    ${LITEPLAYER_DIR}/src/liteplayer_ttsplayer.c)
-add_library(liteplayer_core STATIC ${LITEPLAYER_SRC})
-target_compile_options(liteplayer_core PRIVATE
+    ${LITEPLAYER_DIR}/src/liteplayer_ttsplayer.c
+    ${LITEPLAYER_DIR}/adapter/source_httpclient_wrapper.c
+    ${LITEPLAYER_DIR}/adapter/source_file_wrapper.c)
+add_library(liteplayer STATIC ${LITEPLAYER_SRC})
+target_compile_options(liteplayer PRIVATE
     -Wno-error=narrowing
     -DLITEPLAYER_CONFIG_SINK_FIXED_S16LE -DLITEPLAYER_CONFIG_AAC_SBR
     -DOSCL_IMPORT_REF= -DOSCL_EXPORT_REF= -DOSCL_UNUSED_ARG=\(void\))
-target_include_directories(liteplayer_core PRIVATE
+target_include_directories(liteplayer PRIVATE
     ${LITEPLAYER_DIR}/thirdparty/codecs
     ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/include
     ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/src
@@ -61,8 +63,7 @@ target_include_directories(liteplayer_core PRIVATE
 
 # tmallgenie_open files
 set(TMALLGENIE_OPEN_SRC
-    ${LITEPLAYER_DIR}/adapter/source_httpclient_wrapper.c
-    ${LITEPLAYER_DIR}/adapter/source_file_wrapper.c
+    ${TMALLGENIE_DIR}/src/base/websocket_client.c
     ${TMALLGENIE_DIR}/src/core/GenieService.c
     ${TMALLGENIE_DIR}/src/player/GenieUtpManager.c
     ${TMALLGENIE_DIR}/src/player/GeniePlayer.c
@@ -70,9 +71,9 @@ set(TMALLGENIE_OPEN_SRC
     ${TMALLGENIE_DIR}/src/recorder/GenieRecorder.c
     ${TMALLGENIE_DIR}/src/GenieSdk.c)
 add_library(tmallgenie_open STATIC ${TMALLGENIE_OPEN_SRC})
-target_include_directories(tmallgenie_open PRIVATE
-    ${TMALLGENIE_DIR}/src ${LITEPLAYER_DIR}/adapter)
-target_compile_options(tmallgenie_open PRIVATE -DGENIE_HAVE_SPEEXOGG_ENABLED)
+target_include_directories(tmallgenie_open PRIVATE ${TMALLGENIE_DIR}/src)
+target_compile_options(tmallgenie_open PRIVATE
+    -DGENIE_HAVE_SPEEXOGG_ENABLED -DNOPOLL_HAVE_SYSUTILS_ENABLED -DNOPOLL_HAVE_MBEDTLS_ENABLED)
 
 # mbedtls files
 file(GLOB MBEDTLS_SRC src ${MBEDTLS_DIR}/library/*.c)
@@ -109,11 +110,9 @@ set(NOPOLL_SRC
     ${NOPOLL_DIR}/src/nopoll_ctx.c
     ${NOPOLL_DIR}/src/nopoll_io.c
     ${NOPOLL_DIR}/src/nopoll_log.c
-    ${NOPOLL_DIR}/src/nopoll_msg.c
-    ${TMALLGENIE_DIR}/src/base/websocket_client.c)
+    ${NOPOLL_DIR}/src/nopoll_msg.c)
 add_library(nopoll STATIC ${NOPOLL_SRC})
-target_compile_options(nopoll PRIVATE
-    -DNOPOLL_HAVE_SYSUTILS_ENABLED -DNOPOLL_HAVE_MBEDTLS_ENABLED)
+target_compile_options(nopoll PRIVATE -DNOPOLL_HAVE_SYSUTILS_ENABLED -DNOPOLL_HAVE_MBEDTLS_ENABLED)
 
 # speex files
 file(GLOB SPEEX_SRC src ${SPEEX_DIR}/libspeex/*.c ${SPEEX_DIR}/libogg/*.c)
@@ -123,17 +122,14 @@ target_compile_options(speex PRIVATE
 
 # tmallgenie_protocol
 add_library(tmallgenie_protocol STATIC IMPORTED)
-set_target_properties(tmallgenie_protocol PROPERTIES IMPORTED_LOCATION "${TMALLGENIE_DIR}/lib/android/${ANDROID_ABI}/libtmallgenie_protocol.a")
+set_target_properties(tmallgenie_protocol PROPERTIES
+    IMPORTED_LOCATION "${TMALLGENIE_DIR}/lib/android/${ANDROID_ABI}/libtmallgenie_protocol.a")
 
 # tmallgenie-jni
-set(JNI_SRC
-    tmallgenie-jni.cpp
-    GenieVendor_Android.cpp
-    GenieVoiceEngine_Android.cpp)
+set(JNI_SRC tmallgenie-jni.cpp GenieVendor_Android.cpp GenieVoiceEngine_Android.cpp)
 add_library(tmallgenie-jni SHARED ${JNI_SRC})
 target_link_libraries(tmallgenie-jni
-    tmallgenie_open tmallgenie_protocol liteplayer_core nopoll speex sysutils mbedtls
-    OpenSLES android log)
+    tmallgenie_open tmallgenie_protocol liteplayer nopoll speex sysutils mbedtls OpenSLES android log)
 
 if(ENABLE_LITEVAD_SPEECH_DETECT)
     set(LITEVAD_DIR "${TOP_DIR}/thirdparty/litevad")

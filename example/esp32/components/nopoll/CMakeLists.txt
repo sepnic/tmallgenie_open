@@ -1,24 +1,21 @@
 set(TOP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../..")
-set(NOPOLL_DIR "${TOP_DIR}/thirdparty/nopoll")
-set(TMALLGENIE_DIR "${TOP_DIR}/src")
 
 set(COMPONENT_REQUIRES)
 set(COMPONENT_PRIV_REQUIRES mbedtls sysutils)
 
-set(COMPONENT_PRIV_INCLUDEDIRS ${NOPOLL_DIR}/src)
+set(COMPONENT_PRIV_INCLUDEDIRS ${TOP_DIR}/thirdparty/nopoll/src)
 
 set(COMPONENT_SRCS
-    ${NOPOLL_DIR}/src/nopoll.c
-    ${NOPOLL_DIR}/src/nopoll_conn_opts.c
-    ${NOPOLL_DIR}/src/nopoll_decl.c
-    ${NOPOLL_DIR}/src/nopoll_listener.c
-    ${NOPOLL_DIR}/src/nopoll_loop.c
-    ${NOPOLL_DIR}/src/nopoll_conn.c
-    ${NOPOLL_DIR}/src/nopoll_ctx.c
-    ${NOPOLL_DIR}/src/nopoll_io.c
-    ${NOPOLL_DIR}/src/nopoll_log.c
-    ${NOPOLL_DIR}/src/nopoll_msg.c
-    ${TMALLGENIE_DIR}/base/websocket_client.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll_conn_opts.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll_decl.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll_listener.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll_loop.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll_conn.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll_ctx.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll_io.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll_log.c
+    ${TOP_DIR}/thirdparty/nopoll/src/nopoll_msg.c
 )
 
 register_component()

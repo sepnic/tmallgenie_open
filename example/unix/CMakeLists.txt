@@ -51,7 +51,7 @@ endif()
 include_directories(${TOP_DIR}/include)
 include_directories(${SYSUTILS_DIR}/include)
 include_directories(${NOPOLL_DIR}/src)
-include_directories(${LITEPLAYER_DIR}/include)
+include_directories(${LITEPLAYER_DIR}/include ${LITEPLAYER_DIR}/adapter)
 include_directories(${LITEVAD_DIR}/include)
 include_directories(${SPEEX_DIR}/include)
 include_directories(${SNOWBOY_DIR}/include)
@@ -70,8 +70,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -Wall -std=c++11")
 
 # genie open files
 set(TMALLGENIE_OPEN_SRC
-    ${LITEPLAYER_DIR}/adapter/source_httpclient_wrapper.c
-    ${LITEPLAYER_DIR}/adapter/source_file_wrapper.c
+    ${TOP_DIR}/src/base/websocket_client.c
     ${TOP_DIR}/src/core/GenieService.c
     ${TOP_DIR}/src/player/GenieUtpManager.c
     ${TOP_DIR}/src/player/GeniePlayer.c
@@ -79,8 +78,11 @@ set(TMALLGENIE_OPEN_SRC
     ${TOP_DIR}/src/recorder/GenieRecorder.c
     ${TOP_DIR}/src/GenieSdk.c)
 add_library(tmallgenie_open STATIC ${TMALLGENIE_OPEN_SRC})
-target_include_directories(tmallgenie_open PRIVATE ${TOP_DIR}/src ${LITEPLAYER_DIR}/adapter)
-target_compile_options(tmallgenie_open PRIVATE -DGENIE_HAVE_SPEEXOGG_ENABLED)
+target_include_directories(tmallgenie_open PRIVATE ${TOP_DIR}/src)
+target_compile_options(tmallgenie_open PRIVATE
+    -DGENIE_HAVE_SPEEXOGG_ENABLED
+    -DNOPOLL_HAVE_SYSUTILS_ENABLED
+    -DNOPOLL_HAVE_MBEDTLS_ENABLED)
 
 # sysutils files
 set(SYSUTILS_SRC
@@ -112,8 +114,7 @@ set(NOPOLL_SRC
     ${NOPOLL_DIR}/src/nopoll_ctx.c
     ${NOPOLL_DIR}/src/nopoll_io.c
     ${NOPOLL_DIR}/src/nopoll_log.c
-    ${NOPOLL_DIR}/src/nopoll_msg.c
-    ${TOP_DIR}/src/base/websocket_client.c)
+    ${NOPOLL_DIR}/src/nopoll_msg.c)
 add_library(nopoll STATIC ${NOPOLL_SRC})
 target_compile_options(nopoll PRIVATE
     -DNOPOLL_HAVE_SYSUTILS_ENABLED -DNOPOLL_HAVE_MBEDTLS_ENABLED)
@@ -141,13 +142,15 @@ set(LITEPLAYER_SRC
     ${LITEPLAYER_DIR}/src/liteplayer_parser.c
     ${LITEPLAYER_DIR}/src/liteplayer_main.c
     ${LITEPLAYER_DIR}/src/liteplayer_listplayer.c
-    ${LITEPLAYER_DIR}/src/liteplayer_ttsplayer.c)
-add_library(liteplayer_core STATIC ${LITEPLAYER_SRC})
-target_compile_options(liteplayer_core PRIVATE
+    ${LITEPLAYER_DIR}/src/liteplayer_ttsplayer.c
+    ${LITEPLAYER_DIR}/adapter/source_httpclient_wrapper.c
+    ${LITEPLAYER_DIR}/adapter/source_file_wrapper.c)
+add_library(liteplayer STATIC ${LITEPLAYER_SRC})
+target_compile_options(liteplayer PRIVATE
     -Wno-error=narrowing
     -DLITEPLAYER_CONFIG_SINK_FIXED_S16LE
     -DOSCL_IMPORT_REF= -DOSCL_EXPORT_REF= -DOSCL_UNUSED_ARG=)
-target_include_directories(liteplayer_core PRIVATE
+target_include_directories(liteplayer PRIVATE
     ${LITEPLAYER_DIR}/thirdparty/codecs
     ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/include
     ${LITEPLAYER_DIR}/thirdparty/codecs/pvmp3/src
@@ -252,5 +255,5 @@ add_executable(GenieMain ${CMAKE_SOURCE_DIR}/GenieMain.c ${TMALLGENIE_ADAPTER_SR
 target_include_directories(GenieMain PRIVATE ${TOP_DIR}/adapter)
 target_link_libraries(GenieMain
     tmallgenie_open tmallgenie_protocol
-    liteplayer_core nopoll litevad speex sysutils pthread
+    liteplayer nopoll litevad speex sysutils pthread
     ${MBEDTLS_LIBS} ${PLATFORM_LIBS})
