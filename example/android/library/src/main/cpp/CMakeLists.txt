@@ -63,6 +63,7 @@ target_include_directories(liteplayer_core PRIVATE
 set(TMALLGENIE_OPEN_SRC
     ${LITEPLAYER_DIR}/adapter/source_httpclient_wrapper.c
     ${LITEPLAYER_DIR}/adapter/source_file_wrapper.c
+    ${TMALLGENIE_DIR}/src/core/GenieService.c
     ${TMALLGENIE_DIR}/src/player/GenieUtpManager.c
     ${TMALLGENIE_DIR}/src/player/GeniePlayer.c
     ${TMALLGENIE_DIR}/src/player/vendorplayer/GenieVendorPlayer.c
@@ -120,9 +121,9 @@ add_library(speex STATIC ${SPEEX_SRC})
 target_compile_options(speex PRIVATE
     -DFIXED_POINT -DUSE_KISS_FFT -DEXPORT= -DSPEEX_HAVE_SYSUTILS_ENABLED)
 
-# tmallgenie_core
-add_library(tmallgenie_core STATIC IMPORTED)
-set_target_properties(tmallgenie_core PROPERTIES IMPORTED_LOCATION "${TMALLGENIE_DIR}/lib/android/${ANDROID_ABI}/libtmallgenie_core.a")
+# tmallgenie_protocol
+add_library(tmallgenie_protocol STATIC IMPORTED)
+set_target_properties(tmallgenie_protocol PROPERTIES IMPORTED_LOCATION "${TMALLGENIE_DIR}/lib/android/${ANDROID_ABI}/libtmallgenie_protocol.a")
 
 # tmallgenie-jni
 set(JNI_SRC
@@ -131,7 +132,7 @@ set(JNI_SRC
     GenieVoiceEngine_Android.cpp)
 add_library(tmallgenie-jni SHARED ${JNI_SRC})
 target_link_libraries(tmallgenie-jni
-    tmallgenie_open tmallgenie_core liteplayer_core nopoll speex sysutils mbedtls
+    tmallgenie_open tmallgenie_protocol liteplayer_core nopoll speex sysutils mbedtls
     OpenSLES android log)
 
 if(ENABLE_LITEVAD_SPEECH_DETECT)
