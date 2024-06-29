@@ -219,14 +219,14 @@ if(ENABLE_GENIE_ADAPTER_PORTAUDIO)
     set(PLATFORM_LIBS portaudio ${PLATFORM_LIBS})
 
     set(TMALLGENIE_ADAPTER_SRC
-        ${TOP_DIR}/adapter/portaudio/GenieVoiceEngine_PortAudio.c
-        ${TOP_DIR}/adapter/portaudio/GenieVendor_PortAudio.c)
+        ${CMAKE_SOURCE_DIR}/adapter/portaudio/GenieVoiceEngine_PortAudio.c
+        ${CMAKE_SOURCE_DIR}/adapter/portaudio/GenieVendor_PortAudio.c)
 else()
     if(CMAKE_SYSTEM_NAME MATCHES "Linux")
         # linux alsa
         set(TMALLGENIE_ADAPTER_SRC
-            ${TOP_DIR}/adapter/alsa/GenieVoiceEngine_Alsa.c
-            ${TOP_DIR}/adapter/alsa/GenieVendor_Alsa.c)
+            ${CMAKE_SOURCE_DIR}/adapter/alsa/GenieVoiceEngine_Alsa.c
+            ${CMAKE_SOURCE_DIR}/adapter/alsa/GenieVendor_Alsa.c)
         set(PLATFORM_LIBS "asound -lf77blas -lcblas -llapack_atlas -latlas")
     else()
         message(FATAL_ERROR "None genie adapter, abort....")
@@ -252,7 +252,7 @@ endif()
 
 # GenieMain
 add_executable(GenieMain ${CMAKE_SOURCE_DIR}/GenieMain.c ${TMALLGENIE_ADAPTER_SRC})
-target_include_directories(GenieMain PRIVATE ${TOP_DIR}/adapter)
+target_include_directories(GenieMain PRIVATE ${CMAKE_SOURCE_DIR}/adapter)
 target_link_libraries(GenieMain
     tmallgenie_open tmallgenie_protocol
     liteplayer nopoll litevad speex sysutils pthread

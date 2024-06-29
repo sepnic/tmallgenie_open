@@ -61,7 +61,7 @@
 - Genie Interaction Service：端云交互中心，包括服务端对接、账户激活鉴权、网关协议解析、设备状态机，见 https://github.com/sepnic/tmallgenie_open/tree/main/src/core （注：精灵协议不开源）
 - Genie Recorder：录音器，负责录音和语音压缩上传，见 https://github.com/sepnic/tmallgenie_open/tree/main/src/recorder
 - Genie Player：播放控制及播放器，见 https://github.com/sepnic/tmallgenie_open/tree/main/src/player
-- Vendor Voice Engine：平台层的语音引擎，负责回音消除、噪音抑制、语音唤醒、VAD 语句判停等处理，MacOSX/Ubuntu 平台这方面的实现见 https://github.com/sepnic/tmallgenie_open/tree/main/adapter/portaudio
+- Vendor Voice Engine：平台层的语音引擎，负责回音消除、噪音抑制、语音唤醒、VAD 语句判停等处理，MacOSX/Ubuntu 平台这方面的实现见 https://github.com/sepnic/tmallgenie_open/tree/main/example/unix/adapter/portaudio
 
 Genie Interaction Service 是大管家，接收服务端下发的指令（比如音乐和TTS播放、闹钟和提醒设置、灯效设置、屏幕显示、智能家居控制），接收设备端各个子组件上传的状态、事件、请求（比如网络连接断开事件、语音唤醒事件、语音静音事件、音量调整事件、播放状态、NLU 请求），指令和事件都在这里进行仲裁并决定下一步行动。底下的子组件是相互独立的，各自只与 Genie Interaction Service 交互，这样做的好处是子组件都是独立解耦的，相互之间没有依赖，各自处理好自己分内之事即可。一般来说子组件需要注册一个指令监听者以处理下发的指令，还有调用相关回调函数上传自身的状态和事件。比如 player 需要处理所有与播放相关的指令并上传播放器状态，Vendor Voice Engine 需要上传语音唤醒事件和语音静音事件。
 

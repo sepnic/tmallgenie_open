@@ -4,7 +4,8 @@
 /*.a
 /GenieMain
 
+/out
 /mbedtls-2.16.12.tar.gz
 /pa_stable_v190700_20210406.tgz
-mbedtls/
-portaudio/
+/mbedtls
+/portaudio
