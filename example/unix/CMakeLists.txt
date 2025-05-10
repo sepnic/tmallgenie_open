@@ -205,7 +205,7 @@ endif()
 
 # genie adapter
 if(ENABLE_GENIE_ADAPTER_PORTAUDIO)
-    execute_process(COMMAND ${CMAKE_SOURCE_DIR}/install_portaudio.sh
+    execute_process(COMMAND ${CMAKE_SOURCE_DIR}/install_portaudio_github.sh
                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     include_directories(${CMAKE_CURRENT_BINARY_DIR}/portaudio/install/include)
     link_directories(${CMAKE_CURRENT_BINARY_DIR}/portaudio/install/lib)
